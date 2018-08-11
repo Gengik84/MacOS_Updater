@@ -1,0 +1,429 @@
+#!/bin/sh
+
+#
+# By Gengik84
+#
+# Based on Pike R. Alpha's script and crazybirdy's modifications.
+#
+# Many thanks to PikeRAlpha, crazybirdy and PMheart!
+#
+
+# set -x
+
+#
+# Tip: In case you run into the ERROR_7E7AEE96CA error then you need to change the ProductVersion and 
+# in /System/Library/CoreServices/SystemVersion.plist to 10.13
+#
+
+#
+# GLOBAL VARS (will be updated by parseCatalog() )
+#
+urlIndex=""
+keyNum=""
+keyIndex=""
+keySalt=""
+
+#
+function printInfo(){
+  printf "\e[1m${1}\e[0;1m"
+}  
+
+function printInfo_Blue(){
+  printf "\033[1;34;5m${1}\033[0m\n"
+} 
+
+function printInfo_Green(){
+  printf "\e[32;1m${1}\e[0m\n"
+}
+
+function ResetColor(){
+  printf "\e[0m${1}\e[1m\n"
+}
+
+STY_LINE(){
+  echo  "-------------------------------------------------------------------------------\n"
+}
+
+
+#
+# You may need VolumeCheck() to return true (and thus skip checks)
+#
+export __OS_INSTALL=1
+
+#
+# Skip firmware update.
+#
+export __FIRMWARE_UPDATE_OPTOUT
+
+#
+# Do not convert target HFS volume to APFS (OSInstaller).
+#
+export __APFS_OPTOUT=1
+
+#
+# Change additional shell optional behavior (expand unmatched names to a null string).
+#
+shopt -s nullglob
+
+#
+# Initialisation of a variable (our target folder).
+#
+tmpDirectory="/tmp"
+
+#
+# Name of target installer package
+#
+installerPackage="installer.pkg"
+
+function selectChannel() {
+  catalogs=(
+    # dev
+    "https://swscan.apple.com/content/catalogs/others/index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+    # pub
+    "https://swscan.apple.com/content/catalogs/others/index-10.14beta-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+    # normal
+    "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+  )
+  channels=(
+    # dev
+    "Developer Beta"
+    # pub
+    "Public Beta"
+    # normal
+    "Normal Channel"
+  )
+
+  i=0
+  catalogURL=""
+
+  while true; do
+    for channel in "${channels[@]}"; do
+      echo "[ $i ] ${channel}"
+      let i++ 
+    done
+    read -p "Please select a channel: " channelNum
+    catalogURL="${catalogs[${channelNum}]}"
+
+    # only 0 to 2 available
+    if [[ ! "${channelNum}" -ge 0 || ! "${channelNum}" -le 2 ]]; then
+      echo "Wrong choice!"
+      # restore i
+      i=0
+      # try again
+      continue
+    fi
+
+    echo "Your choice is: [ ${channelNum} ] ${channels[${channelNum}]},"
+    read -p "Right? (Y/N) " confirmChannel
+    case "${confirmChannel}" in
+      y | Y )
+        break
+      ;;
+
+      * )
+        # restore i
+        i=0
+        echo "Try again..."
+      ;;
+    esac
+  done
+}
+
+function parseCatalog() {
+  selectChannel
+
+  cd "${tmpDirectory}"
+
+  curl "${catalogURL}" -o update-catalogs.gz
+  [[ $? -ne 0 ]] && echo "FAILED!" && exit 1
+
+  gunzip update-catalogs.gz
+
+  urlIndex="$(cat /tmp/update-catalogs | \
+              grep macOSUpd10.14 | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+              sed 's/<string>//' | sed 's/<\/string>//' | \
+              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
+
+  keyNum="$(echo ${urlIndex} | cut -d/ -f2,3)"
+  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
+  keySalt="$(echo ${urlIndex} | cut -d/ -f5,5)"
+}
+
+function checkDir() {
+  #
+  # Check target directory.
+  #
+  if [ ! -d "${tmpDirectory}/${keyIndex}" ]
+    then
+      mkdir "${tmpDirectory}/${keyIndex}"
+      cd "${tmpDirectory}/${keyIndex}"
+  fi
+}
+
+function downloadDist() {
+  #
+  # URL copied from sucatalog.gz (think CatalogURL).
+  #
+  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
+
+  #
+  # Target distribution language.
+  #
+  distribution="${keyIndex}.English.dist"
+
+  #
+  # Download distribution file
+  #
+  if [ ! -e "${tmpDirectory}/${keyIndex}/${distribution}" ];
+    then
+     printInfo "Downloading: ${distribution} ...\n"
+     ResetColor
+      curl "${url}${distribution}" -o "${tmpDirectory}/${keyIndex}/${distribution}"
+    else
+      
+      printInfo_Green "File: ${distribution} already there, skipping download.\n"
+      ResetColor
+  fi
+}
+
+function downloadPkg() {
+  #
+  # Target files copied from sucatalog.gz (think CatalogURL).
+  #
+  targetFiles=(
+    FirmwareUpdate.pkg
+    FullBundleUpdate.pkg
+    EmbeddedOSFirmware.pkg
+    macOSUpd10.14.pkg
+    macOSUpd10.14Patch.pkg
+    macOSUpd10.14.RecoveryHDUpdate.pkg
+    macOSBrain.pkg
+    SecureBoot.pkg
+  )
+
+  #
+  # Change to working directory (otherwise it will fail to locate the packages).
+  #
+  cd "${tmpDirectory}/${keyIndex}"
+
+  #
+  # Reset index variable.
+  #
+  let index=0
+
+  #
+  # Download target files.
+  #
+  for filename in "${targetFiles[@]}"
+    do
+      if [ ! -e "${tmpDirectory}/${keyIndex}/${filename}" ];
+        then
+          STY_LINE
+          printInfo "Downloading: ${filename} ...\n"
+          curl "${url}${filename}" -o "${tmpDirectory}/${keyIndex}/${filename}"
+        else
+          STY_LINE
+          printInfo_Green "File: ${filename} already there, skipping download.\n"
+      fi
+
+      let index++
+    done
+}
+
+function selectTarget() {
+  #
+  # Initialisation of a variable.
+  #
+  let index=0
+
+  #
+  # Change to Volumes folder.
+  #
+  cd /Volumes
+
+  #
+  # Collect available target volume names.
+  #
+  targetVolumes=(*)
+  printInfo "\nAvailable target volumes:\n"
+  echo
+  for volume in "${targetVolumes[@]}"
+    do
+      echo "\t[$index] ${volume}"
+      let index++
+  done
+
+  echo ""
+
+  #
+  # Ask to select a target volume.
+  #
+  read -p "Select a target volume for the boot file: " volumeNumber
+
+  #
+  # Path to target volume.
+  #
+  targetVolume="/Volumes/${targetVolumes[$volumeNumber]}"
+
+  #
+  # Path to enrollment plist.
+  #
+  seedEnrollmentPlist="${targetVolume}/Users/Shared/.SeedEnrollment.plist"
+
+  #
+  # Write enrollement plist when missing (seed program options: CustomerSeed, DeveloperSeed or PublicSeed).
+  #
+  if [ ! -e "${seedEnrollmentPlist}" ]
+    then
+      echo '<?xml version="1.0" encoding="UTF-8"?>'                                 >  "${seedEnrollmentPlist}"
+      echo '<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'  >> "${seedEnrollmentPlist}"
+      echo '<plist version="1.0">'                                          >> "${seedEnrollmentPlist}"
+      echo '  <dict>'                                                 >> "${seedEnrollmentPlist}"
+      echo '    <key>SeedProgram</key>'                                       >> "${seedEnrollmentPlist}"
+      echo '    <string>DeveloperSeed</string>'                                   >> "${seedEnrollmentPlist}"
+      echo '  </dict>'                                                >> "${seedEnrollmentPlist}"
+      echo '</plist>'                                                 >> "${seedEnrollmentPlist}"
+  fi
+}
+
+function updateRecovery() {
+  echo "Updating Recovery HD..."
+
+  cd "${tmpDirectory}"
+  rm -rf updRec
+  mkdir "updRec" && cd "updRec"
+
+  curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm"
+  [[ $? -ne 0 ]] && echo "FAILED to download dm!" && exit 1
+
+  chmod +x dm
+
+  # check for macOSUpd10.14.RecoveryHDUpdate.pkg
+  RecoverHDPackage="${tmpDirectory}/${keyIndex}/macOSUpd10.14.RecoveryHDUpdate.pkg"
+  if [[ ! -f "${RecoverHDPackage}" ]]; then
+    echo "Package for updating Recovery HD not found!"
+    exit 1
+  fi
+
+  # Thanks crazybirdy for the following code: (slightly modified)
+  #===============================================================
+
+  ###### crazybirdy add ######
+  /bin/rm -rf /tmp/RecoveryHDUpdate
+  pkgutil --expand-full "${RecoverHDPackage}" /tmp/RecoveryHDUpdate
+  PACKAGE_PATH="/tmp/RecoveryHDUpdate/RecoveryHDMeta.dmg"
+  TARGET="${targetVolume}"
+  dmbin="${tmpDirectory}/updRec/dm"
+  ###### crazybirdy add ######
+
+  echo
+  echo "Attempting to create temporary mount point"
+  MOUNT_POINT="$(/usr/bin/mktemp -d)"
+
+  echo
+  echo "Attempting mount of ${PACKAGE_PATH} to ${MOUNT_POINT}"
+  echo
+  /usr/bin/hdiutil attach -nobrowse "${PACKAGE_PATH}" -mountpoint "${MOUNT_POINT}"
+  echo
+
+  echo "Probing Target Volume: ${TARGET}"
+  FS_TYPE=$(diskutil info "${TARGET}" | awk '$1 == "Type" { print $NF }')
+  echo "Target Volume FS: ${FS_TYPE}"
+  echo
+  if [[ "${FS_TYPE}" == "apfs" ]]; then
+    echo "Running ensureRecoveryBooter for APFS target volume: ${TARGET}"
+    "${dmbin}" ensureRecoveryBooter "${TARGET}" -base "${MOUNT_POINT}/BaseSystem.dmg" "${MOUNT_POINT}/BaseSystem.chunklist" -diag "${MOUNT_POINT}/AppleDiagnostics.dmg" "${MOUNT_POINT}/AppleDiagnostics.chunklist" -diagmachineblacklist 0 -installbootfromtarget 0 -slurpappleboot 0 -delappleboot 0 -addkernelcoredump 0
+  else
+    echo "Running ensureRecoveryPartition for Non-APFS target volume: ${TARGET}"
+    "${dmbin}" ensureRecoveryPartition "${TARGET}" "${MOUNT_POINT}/BaseSystem.dmg" "${MOUNT_POINT}/BaseSystem.chunklist" "${MOUNT_POINT}/AppleDiagnostics.dmg" "${MOUNT_POINT}/AppleDiagnostics.chunklist" 0 0 0
+  fi
+
+  echo
+  echo "Eject ${MOUNT_POINT}"
+  /usr/bin/hdiutil eject "${MOUNT_POINT}"
+  echo "Delete ${MOUNT_POINT}"
+  /bin/rm -rf "${MOUNT_POINT}"
+
+  ###### crazybirdy add ######
+  /bin/rm -rf /tmp/RecoveryHDUpdate
+  ###### 10.14.x end ######
+  ###### 10.14.x end ######
+
+  #===============================================================
+}
+
+function updateBaseSystem() {
+  printInfo_Blue "Building Installer...\n"
+  cd "${tmpDirectory}/${keyIndex}"
+  #
+  # remove this line to avoid ERROR_7E7AEE96CA error
+  #
+  sudo perl -pi -e 's|\<volume-check script\=\"VolumeCheck\(\)\"\/\>||' "${keyIndex}".English.dist
+  perl -pi -e 's|\<installation\-check script\=\"InstallationCheck\(\)\"\/\>||' "${keyIndex}".English.dist
+  
+  #
+  # Create an installer.pkg
+  #
+  productbuild --distribution "${tmpDirectory}/${keyIndex}/${distribution}" --package-path "${tmpDirectory}/${keyIndex}" "${tmpDirectory}/${keyIndex}"/"${installerPackage}"
+  
+  #
+  # Launch the installer. (Update the system)
+  #
+  if [ -e "${tmpDirectory}/${keyIndex}/${installerPackage}" ]
+    then
+    printInfo_Blue "Running installer ...\n"
+    /usr/sbin/installer -pkg "${tmpDirectory}/${keyIndex}/${installerPackage}" -target "${targetVolume}"
+  fi
+}
+
+function updateSystem() {
+  # update Recovery first
+  updateRecovery
+
+  # then base system
+  updateBaseSystem
+}
+
+function endProgram(){
+  printInfo_Blue "Cleaning temp files..."
+  rm -rf "${tmpDirectory}/${keyIndex}" 2>/dev/null
+  rm -rf "${tmpDirectory}"/update-catalogs 2>/dev/null
+  rm -rf "${tmpDirectory}"/updRec 2>/dev/null
+
+  STY_LINE
+  printInfo "Requires system reboot..."
+}
+
+function askReboot(){
+  read -p "Do you want to reboot now? (y/N) " confirmReboot
+    case "${confirmReboot}" in
+        y | Y )
+           reboot
+        ;;
+
+        * )
+           echo -e "\nReboot Aborted.\n"
+        ;;
+    esac
+}
+
+function main() {
+  parseCatalog
+  checkDir
+  downloadDist
+  downloadPkg
+  selectTarget
+  updateSystem
+  endProgram
+  askReboot
+}
+
+clear
+if [[ $EUID -ne 0 ]]; then
+  echo "$(basename "$0") must be run as ROOT!"
+  sudo "$0" "$@"
+else
+  main "$@"
+fi
+
+exit
