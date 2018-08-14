@@ -356,10 +356,17 @@ function updateBaseSystem() {
   printInfo_Blue "Building Installer...\n"
   cd "${tmpDirectory}/${keyIndex}"
   #
-  # remove this line to avoid ERROR_7E7AEE96CA error
+  # remove this line to avoid installer error
   #
-  sudo perl -pi -e 's|\<volume-check script\=\"VolumeCheck\(\)\"\/\>||' "${keyIndex}".English.dist
-  perl -pi -e 's|\<installation\-check script\=\"InstallationCheck\(\)\"\/\>||' "${keyIndex}".English.dist
+  cp "${keyIndex}".English.dist "${keyIndex}".English.dist-org
+  sed -e '/volume-check/d' "${keyIndex}".English.dist > new1.txt
+  sed -e '/installation-check/d' new1.txt > new2.txt
+  sed -e '/RecoveryHDUpdate/d' new2.txt > new3.txt
+  sed -e '/system-image/d' new3.txt > new4.txt
+  sed -e '/Patch/d' new4.txt > new5.txt
+  cp new5.txt "${keyIndex}".English.dist
+  rm "${keyIndex}".English.dist-org
+  rm new?.txt
   
   #
   # Create an installer.pkg
