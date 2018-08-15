@@ -71,6 +71,11 @@ shopt -s nullglob
 tmpDirectory="/tmp"
 
 #
+# Directory for Backup
+#
+userPath="/Users/`users`/Desktop"
+
+#
 # Name of target installer package
 #
 installerPackage="installer.pkg"
@@ -391,6 +396,18 @@ function updateSystem() {
   updateBaseSystem
 }
 
+function askForBackup() {
+  read -p "Do you want to backup installer.pkg? (y/N) " confirmBackup
+  case "${confirmBackup}" in
+    y | Y )
+      # Creating DMG
+      printInfo_Blue "Creating dmg for installer backup..." && printInfo_Green "Please wait..."
+      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}"/Installer_"${keyIndex}"
+
+    ;;
+  esac
+}
+
 function endProgram(){
   printInfo_Blue "Cleaning temp files..."
   rm -rf "${tmpDirectory}/${keyIndex}" 2>/dev/null
@@ -415,15 +432,30 @@ function askReboot(){
 }
 
 function main() {
+  case "$1" in
+    "-i"|"-installer" )
+      # for use installer.pkg already created..
+      selectTarget
+      read -p "Drag installer.pkg on terminal windows" installerPKG
+      [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1   
+          printInfo_Blue "Running installer ...\n" 
+          /usr/sbin/installer -pkg "${installerPKG}" -target "${targetVolume}"
+
+      askReboot
+    ;;           
+  esac
+
   parseCatalog
   checkDir
   downloadDist
   downloadPkg
   selectTarget
   updateSystem
+  askForBackup
   endProgram
-  askReboot
+  askReboot 
 }
+
 
 clear
 if [[ $EUID -ne 0 ]]; then
