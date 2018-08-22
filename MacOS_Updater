@@ -442,6 +442,7 @@ function main() {
           /usr/sbin/installer -pkg "${installerPKG}" -target "${targetVolume}"
 
       askReboot
+      exit
     ;;           
   esac
 
