@@ -191,6 +191,30 @@ function downloadDist() {
   fi
 }
 
+function showBuild(){
+  cd "${tmpDirectory}/${keyIndex}"
+  LatestBuild="$(cat ${distribution} | awk NR==14 | \sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
+  STY_LINE
+  printInfo "Latest Build: (${channels[channelNum]})" && printInfo_Green "${LatestBuild}"
+  STY_LINE
+  read -p "Confirm the update to this build? (Y/N) " confirmUpdate
+  case "${confirmUpdate}" in
+    y | Y )
+      break
+    ;;
+
+    n | N )
+      exit 1
+    ;;
+
+    * )
+      # restore i
+      i=0
+      echo "Try again..."
+      ;;
+  esac
+}
+
 function downloadPkg() {
   #
   # Target files copied from sucatalog.gz (think CatalogURL).
@@ -449,6 +473,7 @@ function main() {
   parseCatalog
   checkDir
   downloadDist
+  showBuild
   downloadPkg
   selectTarget
   updateSystem
