@@ -1,6 +1,6 @@
 # MacOS_Updater
 
-Script to download macOS Mojave updates. Particularly for those who are still using HFS+. (Now Mojave with HFS+ is not able to receive system updates from Mac App Store/System Preferences)
+Script to download macOS Mojave updates. Particularly for those who are still using HFS+. (Now Mojave with HFS+ is not able to receive system updates from System Preferences)
 
 ## How to use?
 Run the command below (will be downloaded to the current directory):
