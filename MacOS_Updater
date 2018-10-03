@@ -145,7 +145,7 @@ function parseCatalog() {
   gunzip update-catalogs.gz
 
   urlIndex="$(cat /tmp/update-catalogs | \
-              grep macOSUpd10.14 | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+              grep macOSUpd10.14.1 | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
               sed 's/<string>//' | sed 's/<\/string>//' | \
               awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
 
@@ -193,7 +193,7 @@ function downloadDist() {
 
 function showBuild(){
   cd "${tmpDirectory}/${keyIndex}"
-  LatestBuild="$(cat ${distribution} | awk NR==14 | \sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
+  LatestBuild="$(cat ${distribution} | awk NR==13 | \sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
   STY_LINE
   printInfo "Latest Build: (${channels[channelNum]})" && printInfo_Green "${LatestBuild}"
   STY_LINE
