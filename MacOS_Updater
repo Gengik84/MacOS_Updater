@@ -9,7 +9,7 @@
 #
 
 # uncomment to enable debug logging
-set -x
+# set -x
 
 #
 # Tip: In case you run into the ERROR_7E7AEE96CA error then you need to change the ProductVersion and 
