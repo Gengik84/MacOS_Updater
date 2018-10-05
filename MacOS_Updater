@@ -276,7 +276,15 @@ function confirmUpdate() {
 
   cd "${tmpDirectory}/${keyIndex}"
 
-  local latestBuild="$(cat ${distribution} | awk NR==13 | sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
+  local ver="$(cat ${tmpDirectory}/ver.txt)"
+  local awkNR=0
+  if [[ "${ver}" == "10.14" ]]; then
+    awkNR=14
+  else
+    # FIXME: now only for 10.14.1, how will 10.14.2 be? lets see.
+    awkNR=13
+  fi
+  local latestBuild="$(cat ${distribution} | awk NR==${awkNR} | sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
   printInfo "Latest Build: (${channels[channelNum]})" && printInfo_Green "${latestBuild}"
 
   STY_LINE
@@ -536,8 +544,8 @@ function main() {
       selectTarget
       read -p "Drag installer.pkg on terminal windows" installerPKG
       [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1   
-          printInfo_Blue "Running installer ...\n" 
-          /usr/sbin/installer -pkg "${installerPKG}" -target "${targetVolume}"
+      printInfo_Blue "Running installer ...\n" 
+      /usr/sbin/installer -pkg "${installerPKG}" -target "${targetVolume}"
 
       askReboot
       exit
