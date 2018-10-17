@@ -221,15 +221,22 @@ function parseCatalog() {
   [[ $? -ne 0 ]] && echo "FAILED!" && exit 1
   # decompress it
   gunzip update-catalogs.gz
-
-  # parse the catalog and update corresponding vars
-  urlIndex="$(cat /tmp/update-catalogs | \
-              grep macOSUpd${ver} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-              sed 's/<string>//' | sed 's/<\/string>//' | \
-              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
-  keyNum="$(echo ${urlIndex} | cut -d/ -f2,3)"
-  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
-  keySalt="$(echo ${urlIndex} | cut -d/ -f5,5)"
+  if [[ "${channelNum}" == "2" ]]; then
+  	# fix for normal releases
+    urlIndex="$(cat /tmp/update-catalogs | grep RecoveryHDMetaDmg.pkg.integrityDataV1)"
+    keyNum="$(echo ${urlIndex} | cut -d/ -f6,7)"
+    keyIndex="$(echo ${urlIndex} | cut -d/ -f8,8)"
+    keySalt="$(echo ${urlIndex} | cut -d/ -f9,9)"
+  else
+	  # and here is the code for dev/pub beta
+    urlIndex="$(cat /tmp/update-catalogs | \
+                grep macOSUpd${ver} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                sed 's/<string>//' | sed 's/<\/string>//' | \
+                awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
+    keyNum="$(echo ${urlIndex} | cut -d/ -f2,3)"
+    keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
+    keySalt="$(echo ${urlIndex} | cut -d/ -f5,5)"
+  fi
   # now we are also able to determine which packages to be downloaded
   targetFiles=(
     "FirmwareUpdate.pkg"
@@ -279,7 +286,11 @@ function confirmUpdate() {
   local ver="$(cat ${tmpDirectory}/ver.txt)"
   local awkNR=0
   if [[ "${ver}" == "10.14" ]]; then
-    awkNR=14
+    if [[ "${channelNum}" == "2" ]]; then
+      awkNR=19
+    else  
+      awkNR=14
+    fi
   else
     # FIXME: now only for 10.14.1, how will 10.14.2 be? lets see.
     awkNR=13
