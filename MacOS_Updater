@@ -164,6 +164,7 @@ function selectVersion() {
   local versions=(
     "10.14"
     "10.14.1"
+    "10.14.2"
     # add more releases when they come out (e.g 10.14.2) 
   )
 
