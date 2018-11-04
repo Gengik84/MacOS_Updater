@@ -113,6 +113,7 @@ function selectChannel() {
       let i++
     done
 
+    local channelNum
     read -p ">> " channelNum
     # insane choice?!
     if [[ -z "${channelNum}" || ! "${channelNum}" =~ ^[0-9]+$ || "${channelNum}" -lt 0 || "${channelNum}" -ge $i ]]; then
@@ -128,6 +129,7 @@ function selectChannel() {
     # ask for confirmation
     printf "Your choice: [ ${GREEN}${channelNum}${OFF} ] ${PURPLE}${channel}${OFF}\n"
     while true; do
+      local confirmChannel
       read -p ">> CONFIRM? (Y/N) " confirmChannel
       case "${confirmChannel}" in
         "" )
@@ -166,6 +168,7 @@ function selectVersion() {
     fi
 
     printf "${RED}${version}${OFF} will be downloaded, confirm? (y/n) "
+    local confirmVer
     read -ea confirmVer
     case "${confirmVer}" in
       "" )
@@ -259,6 +262,7 @@ function selectDestination() {
     done
 
     # ask to select a target volume
+    local volNum
     read -p ">> " volNum
     # insane choice?!
     if [[ -z "${volNum}" || ! "${versionNum}" =~ ^[0-9]+$ || "${volNum}" -lt 0 || "${volNum}" -ge $i ]]; then
@@ -271,6 +275,7 @@ function selectDestination() {
     volume="/Volumes/${targetVolumes[volNum]}"
     printf "Your choice: [ ${GREEN}${volNum}${OFF} ] ${CYAN}${vol}${OFF}\n"
     while true; do
+      local confirmVol
       read -p ">> CONFIRM? (y/n) " confirmVol
       case "${confirmVol}" in
         "" )
@@ -378,6 +383,7 @@ function updateSystem() {
 }
 
 function ask4Backup() {
+  local confirmBackup
   read -p "Do you want to backup installer.pkg? (y/N) " confirmBackup
   case "${confirmBackup}" in
     y|Y )
@@ -397,6 +403,7 @@ function endProgram() {
 
   STY_LINE
   printf "${GREEN}RESTART REQUIRED${OFF}\n"
+  local confirmReboot
   read -p "Do you want to reboot now? (y/N) " confirmReboot
   case "${confirmReboot}" in
     y|Y )
@@ -412,6 +419,7 @@ function main() {
   case "$1" in
     -i|--installer )
       selectDestination
+      local installerPKG
       read -p "Drag installer.pkg on terminal windows" installerPKG
       [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1
       printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
