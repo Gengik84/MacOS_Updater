@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# By Gengik84
+# By Gengik84, rewritten by PMheart
 #
 # Based on Pike R. Alpha's script and crazybirdy's modifications.
 #
@@ -11,578 +11,434 @@
 # uncomment to enable debug logging
 # set -x
 
-#
-# Tip: In case you run into the ERROR_7E7AEE96CA error then you need to change the ProductVersion and 
-# in /System/Library/CoreServices/SystemVersion.plist to 10.13
-#
+# Change additional shell optional behavior (expand unmatched names to a null string).
+shopt -s nullglob
 
 #
-# GLOBAL VARS (some of them will be updated by parseCatalog() )
+# VARIABLES
 #
-###################################################
+#----------------------------------------------------------------------------------------------------
 
-# possible channels
-channels=(
-  # dev
-  "Developer Beta"
-  # pub
-  "Public Beta"
-  # normal
-  "Normal Channel"
-)
+#
+# Beta version (ONLY the latest Beta)
+# could be empty when there is no Beta available. (consider 10.14.6)
+#
+betaVersion="10.14.2"
 
-# the exact url based on channels
-catalogURL=""
+# stable version (ONLY the latest stable)
+stableVersion="10.14.1"
 
-# keys for downloading pkg
+#----------------------------------------------------------------------------------------------------
+
+#
+# GLOBAL VARS
+# WILL BE UPDATED BY CERTAIN FUNCTIONS
+#
+#----------------------------------------------------------------------------------------------------
+
+# selected channel for determining URL
+# will be updated by selectChannel()
+channel=""
+# selected catalog URL (see channels and catalogs above)
+# will be updated by selectChannel()
+catalog=""
+# selected system version
+version=""
+# target destination
+volume=""
+
+# package keys
+# will be updated by parseCatalog()
 urlIndex=""
 keyNum=""
 keyIndex=""
 keySalt=""
-
-# packages to be downloaded
-targetFiles=()
-
-# url where the packages live
+# the exact url
 url=""
-# distribution
-distribution=""
+# distribution file
+dist=""
 
-# our target volume
-targetVolume=""
-
-###################################################
-
-function printInfo(){
-  printf "\e[1m${1}\e[0;1m"
-}  
-
-function printInfo_Blue(){
-  printf "\033[1;34;5m${1}\033[0m\n"
-} 
-
-function printInfo_Green(){
-  printf "\e[32;1m${1}\e[0m\n"
-}
-
-function ResetColor(){
-  printf "\e[0m${1}\e[1m\n"
-}
-
-function STY_LINE(){
-  printf "%s\n\n" "-------------------------------------------------------------------------------"
-}
-
-
-#
-# You may need VolumeCheck() to return true (and thus skip checks)
-#
-export __OS_INSTALL=1
-
-#
-# Skip firmware update.
-#
-export __FIRMWARE_UPDATE_OPTOUT
-
-#
-# Do not convert target HFS volume to APFS (OSInstaller).
-#
-export __APFS_OPTOUT=1
-
-#
-# Change additional shell optional behavior (expand unmatched names to a null string).
-#
-shopt -s nullglob
-
-#
-# Initialisation of a variable (our target folder).
-#
+# initialisation of a variable (our target folder).
 tmpDirectory="/tmp"
-
-#
-# Directory for Backup
-#
+# name of target installer package
+installerPackage="installer.pkg"
+# backup dir
 userPath="/Users/`users`/Desktop"
 
-#
-# Name of target installer package
-#
-installerPackage="installer.pkg"
+#----------------------------------------------------------------------------------------------------
 
+#
+# CONSTANTS
+# NO CHANGE NEEDED HERE
+#
+#----------------------------------------------------------------------------------------------------
+
+# possible channels
+channels=(
+  # dev beta (pub beta has been dropped)
+  "Beta"
+  # normal
+  "Normal Channel"
+)
+# possible catalog URLs (corresponding to channels above)
+catalogs=(
+  # beta
+  "https://swscan.apple.com/content/catalogs/others/index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+  # normal
+  "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+)
+
+# colors
+RED="\e[31m"
+GREEN="\e[32m"
+DARK_YELLOW="\e[33m"
+BLUE="\e[34m"
+PURPLE="\e[35m"
+CYAN="\e[36m"
+OFF="\e[0m"
+
+#----------------------------------------------------------------------------------------------------
+
+function STY_LINE() {
+  printf '%s\n\n' '-------------------------------------------------------------------------------'
+}
 
 function selectChannel() {
-  local catalogs=(
-    # dev
-    "https://swscan.apple.com/content/catalogs/others/index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-    # pub
-    "https://swscan.apple.com/content/catalogs/others/index-10.14beta-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-    # normal
-    "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
-  )
- 
-
   local i=0
   while true; do
     # list all possible channels
-    for channel in "${channels[@]}"; do
-      echo "[ $i ] ${channel}"
-      let i++ 
+    printf "${CYAN}SELECT A CHANNEL${OFF}\n"
+    for c in "${channels[@]}"; do
+      printf "[ ${GREEN}${i}${OFF} ] ${PURPLE}${c}${OFF}\n"
+      let i++
     done
 
-    read -p "Please select a channel: " channelNum
+    read -p ">> " channelNum
     # insane choice?!
-    if [[ "${channelNum}" -lt 0 || "${channelNum}" -ge $i ]]; then
-      echo "Wrong choice!"
-      # restore i
+    if [[ -z "${channelNum}" || ! "${channelNum}" =~ ^[0-9]+$ || "${channelNum}" -lt 0 || "${channelNum}" -ge $i ]]; then
+      printf "${RED}Wrong choice!${OFF}\n\n"
+      # restore i to 0 for another traversal
       i=0
-      # try again
       continue
     fi
-    # update the global var
-    catalogURL="${catalogs[${channelNum}]}"
-    echo "Your choice is: [ ${channelNum} ] ${channels[${channelNum}]},"
-    read -p "Right? (Y/N) " confirmChannel
-    case "${confirmChannel}" in
-      y | Y )
-        break
-      ;;
 
-      * )
-        echo "Try again..."
-        # restore i
-        i=0
-        # try again
-        continue
-      ;;
-    esac
+    # update vars
+    channel="${channels[channelNum]}"
+    catalog="${catalogs[channelNum]}"
+    # ask for confirmation
+    printf "Your choice: [ ${GREEN}${channelNum}${OFF} ] ${PURPLE}${channel}${OFF}\n"
+    while true; do
+      read -p ">> CONFIRM? (Y/N) " confirmChannel
+      case "${confirmChannel}" in
+        "" )
+          printf 'Please do type Y if you are sure.\n'
+          continue
+        ;;
+
+        y|Y )
+          # done, terminate the function
+          return
+        ;;
+
+        * )
+          printf 'Try again...\n\n'
+          # restore i to 0 for another traversal
+          i=0
+          # go to the last loop
+          break
+        ;;
+      esac
+    done
   done
 }
 
 function selectVersion() {
   STY_LINE
 
-  local versions=(
-    "10.14"
-    "10.14.1"
-    "10.14.2"
-    # add more releases when they come out (e.g 10.14.2) 
-  )
-
-  local i=0
-  local ver=""
   while true; do
-    # list all possible releases
-    for version in "${versions[@]}"; do
-      echo "[ $i ] ${version}"
-      let i++ 
-    done
-
-    printf "\n%s\n" "Example: Select [0] for ${versions[0]}"
-    read -p "Please select a version: " versionNum
-    # insane choice?!
-    if [[ "${versionNum}" -lt 0 || "${versionNum}" -ge $i ]]; then
-      echo "Wrong choice!"
-      # restore i
-      i=0
-      # try again
-      continue
+    # under dev channel, it is only possible to download Beta
+    if [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]]; then
+      version="${betaVersion}"
+    else
+      # when selecting Normal Channel, or there's no Beta available,
+      # go download the latest stable release.
+      version="${stableVersion}"
     fi
-    ver="${versions[${versionNum}]}"
-    echo "Your choice is: [ ${versionNum} ] ${versions[${versionNum}]},"
-    read -p "Right? (Y/N) " confirmVer
+
+    printf "${RED}${version}${OFF} will be downloaded, confirm? (y/n) "
+    read -ea confirmVer
     case "${confirmVer}" in
-      y | Y )
-        break
+      "" )
+        printf 'Please do type Y if you are sure.\n'
+        continue
+      ;;
+
+      y|Y )
+        # done, terminate the function
+        return
       ;;
 
       * )
-        echo "Try again..."
-        # restore i
-        i=0
-        # try again
+        printf 'Try again...\n\n'
         continue
       ;;
     esac
   done
-
-  # workaround for the local var "ver"
-  echo "${ver}" > "${tmpDirectory}/ver.txt"
 }
 
 function parseCatalog() {
   selectChannel
-  # ver.txt will be created for storing var "ver"
   selectVersion
 
-  cd "${tmpDirectory}"
-  local ver="$(cat ver.txt)"
-
   # download catalog
-  curl "${catalogURL}" -o update-catalogs.gz
-  [[ $? -ne 0 ]] && echo "FAILED!" && exit 1
-  # decompress it
-  gunzip update-catalogs.gz
-  if [[ "${channelNum}" == "2" ]]; then
-  	# fix for normal releases
-    urlIndex="$(cat /tmp/update-catalogs | grep RecoveryHDMetaDmg.pkg.integrityDataV1)"
-    keyNum="$(echo ${urlIndex} | cut -d/ -f6,7)"
-    keyIndex="$(echo ${urlIndex} | cut -d/ -f8,8)"
-    keySalt="$(echo ${urlIndex} | cut -d/ -f9,9)"
-  else
-	  # and here is the code for dev/pub beta
-    urlIndex="$(cat /tmp/update-catalogs | \
-                grep macOSUpd${ver} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-                sed 's/<string>//' | sed 's/<\/string>//' | \
-                awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
-    keyNum="$(echo ${urlIndex} | cut -d/ -f2,3)"
-    keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
-    keySalt="$(echo ${urlIndex} | cut -d/ -f5,5)"
-  fi
-  # now we are also able to determine which packages to be downloaded
-  targetFiles=(
+  cd "${tmpDirectory}"
+  [[ -f update-catalogs ]] && rm -f update-catalogs
+  curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
+
+  # update vars
+  urlIndex="$(cat /tmp/update-catalogs | \
+              grep macOSUpd${version} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+              sed 's/<string>//' | sed 's/<\/string>//' | \
+              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
+  [[ -z "${urlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
+
+  keyNum="$(  echo ${urlIndex} | cut -d/ -f2,3)"
+  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
+  keySalt="$( echo ${urlIndex} | cut -d/ -f5,5)"
+  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
+  dist="${keyIndex}.English.dist"
+
+  # create our working dir
+  local dir="${tmpDirectory}/${keyIndex}"
+  [[ ! -d "${dir}" ]] && mkdir "${dir}"
+  cd "${dir}"
+  # download dist
+  rm -f "${dist}"
+  printf "Downloading: ${BLUE}${dist}${OFF}...\n"
+  curl "${url}${dist}" -o "${dist}"
+}
+
+# confirmUpdate may not be used, skipping
+
+function downloadPackage() {
+  # now we are inside "${tmpDirectory}/${keyIndex}" thanks to the prior parseCatalog()
+
+  # packages to be downloaded
+  local targetFiles=(
     "FirmwareUpdate.pkg"
     "FullBundleUpdate.pkg"
     "EmbeddedOSFirmware.pkg"
-    "macOSUpd${ver}.pkg"
-    "macOSUpd${ver}.Patch.pkg"
-    "macOSUpd${ver}.RecoveryHDUpdate.pkg"
+    "macOSUpd${version}.pkg"
+    "macOSUpd${version}.Patch.pkg"
+    "macOSUpd${version}.RecoveryHDUpdate.pkg"
     "macOSBrain.pkg"
     "SecureBoot.pkg"
   )
-  # time to update the url index and distribution
-  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
-  distribution="${keyIndex}.English.dist"
+
+  # download them
+  for filename in "${targetFiles[@]}"; do
+    rm -rf "${filename}"
+    printf "Downloading: ${BLUE}${filename}${OFF}...\n"
+    curl "${url}${filename}" -o "${filename}"
+
+    STY_LINE
+  done
 }
 
-function checkDir() {
-  #
-  # Check target directory.
-  #
-  if [ ! -d "${tmpDirectory}/${keyIndex}" ]
-    then
-      mkdir "${tmpDirectory}/${keyIndex}"
-      cd "${tmpDirectory}/${keyIndex}"
-  fi
-}
-
-function downloadDist() {
-  #
-  # Download distribution file
-  #
-  if [ ! -e "${tmpDirectory}/${keyIndex}/${distribution}" ];
-    then
-      printInfo "Downloading: ${distribution} ...\n"
-      curl "${url}${distribution}" -o "${tmpDirectory}/${keyIndex}/${distribution}"
-    else
-      printInfo_Green "File: ${distribution} already there, skipping download.\n"
-  fi
-  ResetColor
-}
-
-function confirmUpdate() {
-  STY_LINE
-
-  cd "${tmpDirectory}/${keyIndex}"
-
-  local ver="$(cat ${tmpDirectory}/ver.txt)"
-  local awkNR=0
-  if [[ "${ver}" == "10.14" ]]; then
-    if [[ "${channelNum}" == "2" ]]; then
-      awkNR=19
-    else  
-      awkNR=14
-    fi
-  else
-    # FIXME: now only for 10.14.1, how will 10.14.2 be? lets see.
-    awkNR=13
-  fi
-  local latestBuild="$(cat ${distribution} | awk NR==${awkNR} | sed 's/<string>//' | sed 's/<\/string>//'  2>&1 )"
-  printInfo "Latest Build: (${channels[channelNum]})" && printInfo_Green "${latestBuild}"
-
-  STY_LINE
-
-  read -p "Confirm the update to this build (please do press Y if yes)? (Y/N) " confirmUpdate
-  case "${confirmUpdate}" in
-    y|Y ) ;;
-
-    * )
-      exit 0
-    ;;
-  esac
-}
-
-function downloadPkg() {
-  #
-  # Change to working directory (otherwise it will fail to locate the packages).
-  #
-  cd "${tmpDirectory}/${keyIndex}"
-
-  #
-  # Download target files.
-  #
-  for filename in "${targetFiles[@]}"
-    do
-      if [ ! -e "${tmpDirectory}/${keyIndex}/${filename}" ];
-        then
-          STY_LINE
-          printInfo "Downloading: ${filename} ...\n"
-          curl "${url}${filename}" -o "${tmpDirectory}/${keyIndex}/${filename}"
-        else
-          STY_LINE
-          printInfo_Green "File: ${filename} already there, skipping download.\n"
-      fi
-    done
-}
-
-function selectTarget() {
-  #
-  # Change to Volumes folder.
-  #
+function selectDestination() {
   cd /Volumes
 
-  #
-  # Collect available target volume names.
-  #
   local i=0
-  targetVolumes=(*)
-  while true; do
-    printInfo "\nAvailable target volumes:\n\n"
-    for volume in "${targetVolumes[@]}"
-      do
-        echo "\t[ $i ] ${volume}"
-        let i++
-      done
-    echo ""
+  local targetVolumes=(*)
 
-    #
-    # Ask to select a target volume.
-    #
-    read -p "Select a target volume for the boot file: " volumeNumber
+  while true; do
+    printf "${CYAN}SELECT A DESTINATION${OFF}\n"
+    for vol in "${targetVolumes[@]}"; do
+      printf "[ ${GREEN}${i}${OFF} ] ${CYAN}${vol}${OFF}\n"
+      let i++
+    done
+
+    # ask to select a target volume
+    read -p ">> " volNum
     # insane choice?!
-    if [[ "${volumeNumber}" -lt 0 || "${volumeNumber}" -ge $i ]]; then
-      echo "Wrong choice!"
-      # restore i
+    if [[ -z "${volNum}" || ! "${versionNum}" =~ ^[0-9]+$ || "${volNum}" -lt 0 || "${volNum}" -ge $i ]]; then
+      printf "${RED}Wrong choice!${OFF}\n\n"
+      # restore i to 0 for another traversal
       i=0
-      # try again
       continue
     fi
-    #
-    # Path to target volume.
-    #
-    targetVolume="/Volumes/${targetVolumes[$volumeNumber]}"
-    echo "Your choice is: [ ${volumeNumber} ] ${targetVolumes[${volumeNumber}]},"
-    read -p "Right? (Y/N) " confirmVol
-    case "${confirmVol}" in
-      y | Y )
-        break
-      ;;
 
-      * )
-        echo "Try again..."
-        # restore i
-        i=0
-        # try again
-        continue
-      ;;
-    esac
+    volume="/Volumes/${targetVolumes[volNum]}"
+    printf "Your choice: [ ${GREEN}${volNum}${OFF} ] ${CYAN}${vol}${OFF}\n"
+    while true; do
+      read -p ">> CONFIRM? (y/n) " confirmVol
+      case "${confirmVol}" in
+        "" )
+          printf 'Please do type Y if you are sure.\n'
+          continue
+        ;;
+
+        y|Y )
+          # done, terminate the function
+          return
+        ;;
+
+        * )
+          printf 'Try again...\n\n'
+          # restore i to 0 for another traversal
+          i=0
+          # go to the last loop
+          break
+        ;;
+      esac
+    done
   done
 
-  #
-  # Path to enrollment plist.
-  #
-  local seedEnrollmentPlist="${targetVolume}/Users/Shared/.SeedEnrollment.plist"
-  #
-  # Write enrollement plist when missing (seed program options: CustomerSeed, DeveloperSeed or PublicSeed).
-  #
-  if [ ! -e "${seedEnrollmentPlist}" ]
-    then
-      echo '<?xml version="1.0" encoding="UTF-8"?>'                                 >  "${seedEnrollmentPlist}"
-      echo '<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'  >> "${seedEnrollmentPlist}"
-      echo '<plist version="1.0">'                                          >> "${seedEnrollmentPlist}"
-      echo '  <dict>'                                                 >> "${seedEnrollmentPlist}"
-      echo '    <key>SeedProgram</key>'                                       >> "${seedEnrollmentPlist}"
-      echo '    <string>DeveloperSeed</string>'                                   >> "${seedEnrollmentPlist}"
-      echo '  </dict>'                                                >> "${seedEnrollmentPlist}"
-      echo '</plist>'                                                 >> "${seedEnrollmentPlist}"
+  # create the enrollment plist
+  local seedEnrollmentPlist="${vol}/Users/Shared/.SeedEnrollment.plist"
+  # write enrollement plist when missing (seed program options: CustomerSeed, DeveloperSeed)
+  if [[ ! -f "${seedEnrollmentPlist}" ]]; then
+    echo '<?xml version="1.0" encoding="UTF-8"?>'                                                                  >  "${seedEnrollmentPlist}"
+    echo '<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> "${seedEnrollmentPlist}"
+    echo '<plist version="1.0">'                                                                                   >> "${seedEnrollmentPlist}"
+    echo '  <dict>'                                                                                                >> "${seedEnrollmentPlist}"
+    echo '    <key>SeedProgram</key>'                                                                              >> "${seedEnrollmentPlist}"
+    if [[ "${channel}" == "Beta" ]]; then
+      echo '    <string>DeveloperSeed</string>'                                                                    >> "${seedEnrollmentPlist}"
+    else
+      echo '    <string>CustomerSeed</string>'                                                                     >> "${seedEnrollmentPlist}"
+    fi
+    echo '  </dict>'                                                                                               >> "${seedEnrollmentPlist}"
+    echo '</plist>'                                                                                                >> "${seedEnrollmentPlist}"
   fi
 }
 
 function updateRecovery() {
-  echo "Updating Recovery HD..."
+  printf "${CYAN}UPDATING RECOVERY${OFF}\n"
 
   cd "${tmpDirectory}"
-  local ver="$(cat ver.txt)"
-  rm -rf updRec
-  mkdir "updRec" && cd "updRec"
+  rm -rf "updRec" && mkdir "updRec" && cd "updRec"
 
   # download dm for updating Recovery
-  curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm"
-  [[ $? -ne 0 ]] && echo "FAILED to download dm!" && exit 1
-  # fix permissions
-  chmod +x dm
+  curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm" && chmod +x dm || exit 1
+  local dmBin="${tmpDirectory}/updRec/dm"
 
-  # check for macOSUpd10.14.RecoveryHDUpdate.pkg
-  local recoverHDPackage="${tmpDirectory}/${keyIndex}/macOSUpd${ver}.RecoveryHDUpdate.pkg"
-  if [[ ! -f "${recoverHDPackage}" ]]; then
-    echo "Package for updating Recovery HD not found!"
-    exit 1
-  fi
+  local recPkg="${tmpDirectory}/${keyIndex}/macOSUpd${version}.RecoveryHDUpdate.pkg"
+  [[ ! -f "${recPkg}" ]] && printf "ERROR: ${RED}${recPkg} NOT found!${OFF}\n" && exit 1
 
-  # Thanks crazybirdy for the following code: (slightly modified)
-  #===============================================================
+  local tmpRecUpdDir="/tmp/RecoveryHDUpdate"
+  rm -rf "${tmpRecUpdDir}" && pkgutil --expand-full "${recPkg}" "${tmpRecUpdDir}"
+  local tmpDmg="${tmpRecUpdDir}/RecoveryHDMeta.dmg"
+  # attempt to create a temporary mount point
+  local tmpMountPoint="$(/usr/bin/mktemp -d)"
+  # mount tmpDmg there
+  /usr/bin/hdiutil attach -nobrowse "${tmpDmg}" -mountpoint "${tmpMountPoint}"
 
-  ###### crazybirdy add ######
-  /bin/rm -rf /tmp/RecoveryHDUpdate
-  pkgutil --expand-full "${recoverHDPackage}" /tmp/RecoveryHDUpdate
-  local PACKAGE_PATH="/tmp/RecoveryHDUpdate/RecoveryHDMeta.dmg"
-  local TARGET="${targetVolume}"
-  local dmbin="${tmpDirectory}/updRec/dm"
-  ###### crazybirdy add ######
-
-  echo
-  echo "Attempting to create temporary mount point"
-  local MOUNT_POINT="$(/usr/bin/mktemp -d)"
-
-  echo
-  echo "Attempting mount of ${PACKAGE_PATH} to ${MOUNT_POINT}"
-  echo
-  /usr/bin/hdiutil attach -nobrowse "${PACKAGE_PATH}" -mountpoint "${MOUNT_POINT}"
-  echo
-
-  echo "Probing Target Volume: ${TARGET}"
-  FS_TYPE=$(diskutil info "${TARGET}" | awk '$1 == "Type" { print $NF }')
-  echo "Target Volume FS: ${FS_TYPE}"
-  echo
-  if [[ "${FS_TYPE}" == "apfs" ]]; then
-    echo "Running ensureRecoveryBooter for APFS target volume: ${TARGET}"
-    "${dmbin}" ensureRecoveryBooter "${TARGET}" -base "${MOUNT_POINT}/BaseSystem.dmg" "${MOUNT_POINT}/BaseSystem.chunklist" -diag "${MOUNT_POINT}/AppleDiagnostics.dmg" "${MOUNT_POINT}/AppleDiagnostics.chunklist" -diagmachineblacklist 0 -installbootfromtarget 0 -slurpappleboot 0 -delappleboot 0 -addkernelcoredump 0
+  # probe target volume
+  local fsType="$(diskutil info "${volume}" | awk '$1 == "Type" { print $NF }')"
+  # start updating
+  if [[ "${fsType}" == "apfs" ]]; then
+    "${dmBin}" ensureRecoveryBooter "${volume}" -base "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" -diag "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" -diagmachineblacklist 0 -installbootfromtarget 0 -slurpappleboot 0 -delappleboot 0 -addkernelcoredump 0
   else
-    echo "Running ensureRecoveryPartition for Non-APFS target volume: ${TARGET}"
-    "${dmbin}" ensureRecoveryPartition "${TARGET}" "${MOUNT_POINT}/BaseSystem.dmg" "${MOUNT_POINT}/BaseSystem.chunklist" "${MOUNT_POINT}/AppleDiagnostics.dmg" "${MOUNT_POINT}/AppleDiagnostics.chunklist" 0 0 0
+    "${dmBin}" ensureRecoveryPartition "${volume}" "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" 0 0 0
   fi
 
-  echo
-  echo "Eject ${MOUNT_POINT}"
-  /usr/bin/hdiutil eject "${MOUNT_POINT}"
-  echo "Delete ${MOUNT_POINT}"
-  /bin/rm -rf "${MOUNT_POINT}"
-
-  ###### crazybirdy add ######
-  /bin/rm -rf /tmp/RecoveryHDUpdate
-  ###### 10.14.x end ######
-  ###### 10.14.x end ######
-
-  #===============================================================
+  # done
+  /usr/bin/hdiutil eject "${tmpMountPoint}"
+  rm -rf "${tmpMountPoint}"
+  rm -rf "${tmpRecUpdDir}"
 }
 
-function updateBaseSystem() {
-  printInfo_Blue "Building Installer...\n"
+function updatePrimarySystem() {
+  printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
+
   cd "${tmpDirectory}/${keyIndex}"
-  #
+
   # remove these lines to avoid installer error
-  #
-  cp "${keyIndex}".English.dist "${keyIndex}".English.dist-org
-  sed -e '/volume-check/d' "${keyIndex}".English.dist > new1.txt
+  sed -e '/volume-check/d' "${dist}"      > new1.txt
   sed -e '/installation-check/d' new1.txt > new2.txt
-  sed -e '/RecoveryHDUpdate/d' new2.txt > new3.txt
-  sed -e '/system-image/d' new3.txt > new4.txt
-  sed -e '/Patch/d' new4.txt > new5.txt
-  cp new5.txt "${keyIndex}".English.dist
-  rm "${keyIndex}".English.dist-org
+  sed -e '/RecoveryHDUpdate/d'   new2.txt > new3.txt
+  sed -e '/system-image/d'       new3.txt > new4.txt
+  sed -e '/Patch/d'              new4.txt > new5.txt
+  cp new5.txt "${dist}"
   rm new?.txt
-  
-  #
-  # Create an installer.pkg
-  #
-  productbuild --distribution "${tmpDirectory}/${keyIndex}/${distribution}" --package-path "${tmpDirectory}/${keyIndex}" "${tmpDirectory}/${keyIndex}"/"${installerPackage}"
-  
-  #
-  # Launch the installer. (Update the system)
-  #
-  if [ -e "${tmpDirectory}/${keyIndex}/${installerPackage}" ]
-    then
-    printInfo_Blue "Running installer ...\n"
-    /usr/sbin/installer -pkg "${tmpDirectory}/${keyIndex}/${installerPackage}" -target "${targetVolume}"
-  fi
+
+  # build pkg
+  productbuild --distribution "${tmpDirectory}/${keyIndex}/${dist}" --package-path "${tmpDirectory}/${keyIndex}" "${tmpDirectory}/${keyIndex}/${installerPackage}"
+
+  # perform the update by launching the installer
+  [[ -f "${tmpDirectory}/${keyIndex}/${installerPackage}" ]] && /usr/sbin/installer -pkg "${tmpDirectory}/${keyIndex}/${installerPackage}" -target "${volume}"
 }
 
 function updateSystem() {
   # update Recovery first
   updateRecovery
-
-  # then base system
-  updateBaseSystem
+  # then primary system
+  updatePrimarySystem
 }
 
-function askForBackup() {
+function ask4Backup() {
   read -p "Do you want to backup installer.pkg? (y/N) " confirmBackup
   case "${confirmBackup}" in
     y|Y )
-      # Creating DMG
-      printInfo_Blue "Creating dmg for installer backup..." && printInfo_Green "Please wait..."
-      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}"/Installer_"${keyIndex}"
+      printf "${CYAN}BACKING UP${OFF}\n"
+      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}/Installer_${version}"
     ;;
   esac
 }
 
-function endProgram(){
-  printInfo_Blue "Cleaning temp files..."
-  rm -rf "${tmpDirectory}/${keyIndex}" 2>/dev/null
-  rm -rf "${tmpDirectory}"/update-catalogs 2>/dev/null
-  rm -rf "${tmpDirectory}"/updRec 2>/dev/null
-  rm -rf "${tmpDirectory}"/ver.txt 2>/dev/null
+function endProgram() {
+  printf "${CYAN}CLEANING UP${OFF}\n"
+
+  rm -rf "${tmpDirectory}/${keyIndex}"
+  rm -rf "${tmpDirectory}/update-catalogs"
+  rm -rf "${tmpDirectory}/updRec"
+  rm -rf "${tmpDirectory}/ver.txt"
 
   STY_LINE
-  printInfo "Requires system reboot..."
-}
-
-function askReboot(){
+  printf "${GREEN}RESTART REQUIRED${OFF}\n"
   read -p "Do you want to reboot now? (y/N) " confirmReboot
   case "${confirmReboot}" in
-    y | Y )
+    y|Y )
       reboot
     ;;
-
-    * )
-      printf "\n%s\n" "Reboot Aborted."
-    ;;
   esac
+
+  printf "${RED}ALL DONE${OFF}\nPlease reboot manually.\n"
 }
 
 function main() {
+  # direct update from a pre-built pkg
   case "$1" in
-    "-i"|"-installer" )
-      # for use installer.pkg already created..
-      selectTarget
+    -i|--installer )
+      selectDestination
       read -p "Drag installer.pkg on terminal windows" installerPKG
-      [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1   
-      printInfo_Blue "Running installer ...\n" 
-      /usr/sbin/installer -pkg "${installerPKG}" -target "${targetVolume}"
+      [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1
+      printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
+      /usr/sbin/installer -pkg "${installerPKG}" -target "${volume}"
 
-      askReboot
-      exit
-    ;;           
+      endProgram
+      # done
+      exit 0
+    ;;
   esac
 
   parseCatalog
-  checkDir
-  downloadDist
-  confirmUpdate
-  downloadPkg
-  selectTarget
+  downloadPackage
+
+  selectDestination
   updateSystem
-  askForBackup
+
+  ask4Backup
+
   endProgram
-  askReboot 
 }
 
-
 clear
+
 if [[ $EUID -ne 0 ]]; then
   echo "$(basename "$0") must be run as ROOT!"
   sudo "$0" "$@"
 else
   main "$@"
 fi
-
-exit 0
