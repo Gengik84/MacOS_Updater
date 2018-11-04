@@ -189,6 +189,27 @@ function selectVersion() {
   done
 }
 
+function updateInfo(){
+  local awkNR=0
+  
+  if [[ "${channel}" == "Normal Channel" ]]; then
+    awkNR=12
+  else 
+# Here for Beta Channel  
+    awkNR=13
+  fi 
+
+  latestBuild="$(cat ${dist} | \
+    sed 's/<string>//' | sed 's/<\/string>//' | \
+    awk '{print $1;}'  |  awk NR==${awkNR} 2>&1)"
+ 
+  STY_LINE 
+  printf "\t\t${GREEN} Latest Build:${PURPLE} ${latestBuild} ${PURPLE} ${OFF}\n"  
+  STY_LINE  
+  printf "${DARK_YELLOW}Continue...${OFF}\n"
+  sleep 3
+}
+
 function parseCatalog() {
   selectChannel
   selectVersion
@@ -219,6 +240,8 @@ function parseCatalog() {
   rm -f "${dist}"
   printf "Downloading: ${BLUE}${dist}${OFF}...\n"
   curl "${url}${dist}" -o "${dist}"
+  
+  updateInfo
 }
 
 # confirmUpdate may not be used, skipping
@@ -240,11 +263,18 @@ function downloadPackage() {
 
   # download them
   for filename in "${targetFiles[@]}"; do
-    rm -rf "${filename}"
-    printf "Downloading: ${BLUE}${filename}${OFF}...\n"
-    curl "${url}${filename}" -o "${filename}"
+    if [ ! -e "${tmpDirectory}/${keyIndex}/${filename}" ]; then
+#     rm -rf "${filename}"
+      printf "Downloading: ${BLUE}${filename}${OFF}...\n"
+      curl "${url}${filename}" -o "${filename}"
 
-    STY_LINE
+      STY_LINE
+    else
+# Skipping if it is already present    
+      printf "File: ${GREEN}${filename} already there,${DARK_YELLOW} skipping download...${OFF}\n"
+      STY_LINE
+    fi   
+
   done
 }
 
@@ -265,7 +295,7 @@ function selectDestination() {
     local volNum
     read -p ">> " volNum
     # insane choice?!
-    if [[ -z "${volNum}" || ! "${versionNum}" =~ ^[0-9]+$ || "${volNum}" -lt 0 || "${volNum}" -ge $i ]]; then
+    if [[ -z "${volNum}" || ! "${volNum}" =~ ^[0-9]+$ || "${volNum}" -lt 0 || "${volNum}" -ge $i ]]; then
       printf "${RED}Wrong choice!${OFF}\n\n"
       # restore i to 0 for another traversal
       i=0
@@ -388,7 +418,7 @@ function ask4Backup() {
   case "${confirmBackup}" in
     y|Y )
       printf "${CYAN}BACKING UP${OFF}\n"
-      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}/Installer_${version}"
+      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}/Installer_${version}_${latestBuild}"
     ;;
   esac
 }
@@ -420,7 +450,7 @@ function main() {
     -i|--installer )
       selectDestination
       local installerPKG
-      read -p "Drag installer.pkg on terminal windows" installerPKG
+      read -p "Drag installer.pkg on terminal windows: " installerPKG
       [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1
       printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
       /usr/sbin/installer -pkg "${installerPKG}" -target "${volume}"
