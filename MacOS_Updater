@@ -104,6 +104,30 @@ function STY_LINE() {
   printf '%s\n\n' '-------------------------------------------------------------------------------'
 }
 
+function downloadFile() {
+  local link="$1"
+  local out="$2"
+
+  local attempt
+  local maxTry=3
+  for (( attempt = 0; attempt < maxTry; attempt++ )); do
+    curl "${link}" -o "${out}"
+    if [[ $? -ne 0 ]]; then
+      # failed, remove the "corrupted" file and try again
+      rm -rf "${out}"
+    else
+      # success
+      return 0
+    fi
+
+    sleep 0.5
+  done
+
+  printf "Failed to download ${RED}${out}${OFF} after ${attempt} times trying!\n"
+  exit 1
+}
+
+
 function selectChannel() {
   local i=0
   while true; do
@@ -166,7 +190,8 @@ function parseCatalog() {
   # download catalog
   cd "${tmpDirectory}"
   [[ -f update-catalogs ]] && rm -f update-catalogs
-  curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
+  # curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
+  downloadFile "${catalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # show version
   [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && version="${betaVersion}" || version="${stableVersion}"
@@ -190,7 +215,8 @@ function parseCatalog() {
   # download dist
   rm -f "${dist}"
   printf "Downloading: ${BLUE}${dist}${OFF}...\n"
-  curl "${url}${dist}" -o "${dist}"
+  # curl "${url}${dist}" -o "${dist}"
+  downloadFile "${url}${dist}" "${dist}"
 
   # show build
   local awkNR=0
@@ -251,14 +277,14 @@ function downloadPackage() {
   clear
   for filename in "${targetFiles[@]}"; do
     if [[ ! -e "${filename}" ]]; then
-    	printf "Downloading: ${BLUE}${filename}${OFF}...\n"
-    	curl "${url}${filename}" -o "${filename}"
+      printf "Downloading: ${BLUE}${filename}${OFF}...\n"
+      downloadFile "${url}${filename}" "${filename}"
     elif [[ -z "$(pkgutil --check-signature ${filename} | grep -i 'signed Apple Software')" ]]; then
-    	printf "File: ${filename} is ${RED}CORRUPTED${OFF}, redownloading...\n"
-    	rm -rf "${filename}"
-    	curl "${url}${filename}" -o "${filename}"
+      printf "File: ${filename} is ${RED}CORRUPTED${OFF}, redownloading...\n"
+      rm -rf "${filename}"
+      downloadFile "${url}${filename}" "${filename}"
     else
-    	printf "File: ${GREEN}${filename}${OFF} is already there, ${DARK_YELLOW}skipping download.${OFF}\n"
+      printf "File: ${GREEN}${filename}${OFF} is already there, ${DARK_YELLOW}skipping download.${OFF}\n"
     fi
 
     STY_LINE
