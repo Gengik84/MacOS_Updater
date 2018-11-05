@@ -127,6 +127,57 @@ function downloadFile() {
   exit 1
 }
 
+function registerScript() {
+  local prefDir="/Users/`users`/.MacOS_Updater"
+  local prefFile="${prefDir}/pref.conf"
+
+  [[ ! -d "${prefDir}" ]] && mkdir "${prefDir}"
+
+  if [[ -f "${prefFile}" ]]; then
+    source "${prefFile}"
+  else
+    clear
+    echo 'It seems to be the first time you are using this script,'
+    echo 'for convenience, you may want to register it,'
+    echo 'in this case you will no more be prompted to enter the password'
+    echo 'until having been moved to elsewhere.'
+    echo 'Note that it might also be a security risk when registering.'
+    echo
+    echo 'Well, it is totally up to you to register or not,'
+    echo 'and you will be no more asked you after this time.'
+    echo
+    
+    while true; do
+      local confirmRegScpt
+      read -p "Would you like to? (y/n) " confirmRegScpt
+      case "${confirmRegScpt}" in
+        y|Y )
+          echo 'wantRegScpt=1' > "${prefFile}"
+          break
+        ;;
+
+        n|N )
+          echo 'wantRegScpt=0' > "${prefFile}"
+          break
+        ;;
+
+        * )
+          echo 'Try again...'
+        ;;
+      esac
+    done
+  fi
+
+  if [[ "${wantRegScpt}" -eq 1 ]]; then
+    local regFile="/etc/sudoers.d/MacOS_Updater"
+    local context="$(users) ALL=(ALL) NOPASSWD: ${0}"
+    if [[ ! -f "${regFile}" || \
+          "$(cat ${regFile})" != "${context}" ]]; then
+      rm -f "${regFile}"
+      echo "${context}" | sudo tee "${regFile}" &> /dev/null
+    fi
+  fi
+}
 
 function selectChannel() {
   local i=0
@@ -456,6 +507,9 @@ function endProgram() {
 }
 
 function main() {
+  # try to register the script
+  registerScript
+
   # direct update from a pre-built pkg
   case "$1" in
     -i|--installer )
