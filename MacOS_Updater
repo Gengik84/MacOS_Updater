@@ -248,6 +248,7 @@ function downloadPackage() {
   )
 
   # download them
+  clear
   for filename in "${targetFiles[@]}"; do
     if [[ ! -e "${filename}" ]]; then
     	printf "Downloading: ${BLUE}${filename}${OFF}...\n"
