@@ -108,9 +108,9 @@ function downloadFile() {
   local link="$1"
   local out="$2"
 
-  local attempt
+  local attempt=0
   local maxTry=3
-  for (( attempt = 0; attempt < maxTry; attempt++ )); do
+  for ((; attempt < maxTry; attempt++ )); do
     curl "${link}" -o "${out}"
     if [[ $? -ne 0 ]]; then
       # failed, remove the "corrupted" file and try again
@@ -190,7 +190,6 @@ function parseCatalog() {
   # download catalog
   cd "${tmpDirectory}"
   [[ -f update-catalogs ]] && rm -f update-catalogs
-  # curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
   downloadFile "${catalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # show version
@@ -215,7 +214,6 @@ function parseCatalog() {
   # download dist
   rm -f "${dist}"
   printf "Downloading: ${BLUE}${dist}${OFF}...\n"
-  # curl "${url}${dist}" -o "${dist}"
   downloadFile "${url}${dist}" "${dist}"
 
   # show build
