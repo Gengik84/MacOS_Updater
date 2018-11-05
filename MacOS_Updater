@@ -60,6 +60,7 @@ dist=""
 
 # initialisation of a variable (our target folder).
 tmpDirectory="/tmp"
+workDir=""
 # name of target installer package
 installerPackage="installer.pkg"
 # backup dir
@@ -142,6 +143,11 @@ function selectChannel() {
           return
         ;;
 
+        n|N )
+          printf 'goodbye\n'
+          exit 0
+        ;;
+
         * )
           printf 'Try again...\n\n'
           # restore i to 0 for another traversal
@@ -154,20 +160,51 @@ function selectChannel() {
   done
 }
 
-function selectVersion() {
-  STY_LINE
+function parseCatalog() {
+  selectChannel
 
+  # download catalog
+  cd "${tmpDirectory}"
+  [[ -f update-catalogs ]] && rm -f update-catalogs
+  curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
+
+  # show version
+  [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && version="${betaVersion}" || version="${stableVersion}"
+
+  # update vars
+  urlIndex="$(cat /tmp/update-catalogs | \
+              grep macOSUpd${version} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+              sed 's/<string>//' | sed 's/<\/string>//' | \
+              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
+  [[ -z "${urlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
+  keyNum="$(  echo ${urlIndex} | cut -d/ -f2,3)"
+  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
+  keySalt="$( echo ${urlIndex} | cut -d/ -f5,5)"
+  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
+  dist="${keyIndex}.English.dist"
+
+  # create our working dir
+  workDir="${tmpDirectory}/${keyIndex}"
+  [[ ! -d "${workDir}" ]] && mkdir "${workDir}"
+  cd "${workDir}"
+  # download dist
+  rm -f "${dist}"
+  printf "Downloading: ${BLUE}${dist}${OFF}...\n"
+  curl "${url}${dist}" -o "${dist}"
+
+  # show build
+  local awkNR=0
+  [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && awkNR=13 || awkNR=12
+  build="$(cat ${dist} | \
+           sed 's/<string>//' | sed 's/<\/string>//' | \
+           awk '{print $1;}'  | awk NR==${awkNR} 2>&1)"
+
+  confirmDownload
+}
+
+function confirmDownload() {
   while true; do
-    # under dev channel, it is only possible to download Beta
-    if [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]]; then
-      version="${betaVersion}"
-    else
-      # when selecting Normal Channel, or there's no Beta available,
-      # go download the latest stable release.
-      version="${stableVersion}"
-    fi
-
-    printf "${RED}${version}${OFF} will be downloaded, confirm? (y/n) "
+    printf "${RED}${version} (${build})${OFF} will be downloaded, confirm? (y/n) "
     local confirmVer
     read -ea confirmVer
     case "${confirmVer}" in
@@ -181,6 +218,12 @@ function selectVersion() {
         return
       ;;
 
+      n|N )
+        rm -rf "${workDir}"
+        printf 'goodbye\n'
+        exit 0
+      ;;
+
       * )
         printf 'Try again...\n\n'
         continue
@@ -189,65 +232,8 @@ function selectVersion() {
   done
 }
 
-function updateInfo(){
-  local awkNR=0
-  
-  if [[ "${channel}" == "Normal Channel" ]]; then
-    awkNR=12
-  else 
-# Here for Beta Channel  
-    awkNR=13
-  fi 
-
-  latestBuild="$(cat ${dist} | \
-    sed 's/<string>//' | sed 's/<\/string>//' | \
-    awk '{print $1;}'  |  awk NR==${awkNR} 2>&1)"
- 
-  STY_LINE 
-  printf "\t\t${GREEN} Latest Build:${PURPLE} ${latestBuild} ${PURPLE} ${OFF}\n"  
-  STY_LINE  
-  printf "${DARK_YELLOW}Continue...${OFF}\n"
-  sleep 3
-}
-
-function parseCatalog() {
-  selectChannel
-  selectVersion
-
-  # download catalog
-  cd "${tmpDirectory}"
-  [[ -f update-catalogs ]] && rm -f update-catalogs
-  curl "${catalog}" -o update-catalogs.gz && gunzip update-catalogs.gz || exit 1
-
-  # update vars
-  urlIndex="$(cat /tmp/update-catalogs | \
-              grep macOSUpd${version} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-              sed 's/<string>//' | sed 's/<\/string>//' | \
-              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
-  [[ -z "${urlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
-
-  keyNum="$(  echo ${urlIndex} | cut -d/ -f2,3)"
-  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
-  keySalt="$( echo ${urlIndex} | cut -d/ -f5,5)"
-  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
-  dist="${keyIndex}.English.dist"
-
-  # create our working dir
-  local dir="${tmpDirectory}/${keyIndex}"
-  [[ ! -d "${dir}" ]] && mkdir "${dir}"
-  cd "${dir}"
-  # download dist
-  rm -f "${dist}"
-  printf "Downloading: ${BLUE}${dist}${OFF}...\n"
-  curl "${url}${dist}" -o "${dist}"
-  
-  updateInfo
-}
-
-# confirmUpdate may not be used, skipping
-
 function downloadPackage() {
-  # now we are inside "${tmpDirectory}/${keyIndex}" thanks to the prior parseCatalog()
+  # now we are inside "${workDir}" thanks to the prior parseCatalog()
 
   # packages to be downloaded
   local targetFiles=(
@@ -263,18 +249,12 @@ function downloadPackage() {
 
   # download them
   for filename in "${targetFiles[@]}"; do
-    if [ ! -e "${tmpDirectory}/${keyIndex}/${filename}" ]; then
-#     rm -rf "${filename}"
-      printf "Downloading: ${BLUE}${filename}${OFF}...\n"
-      curl "${url}${filename}" -o "${filename}"
+    # just in case there's a previous incomplete download...
+    rm -rf "${filename}"
+    printf "Downloading: ${BLUE}${filename}${OFF}...\n"
+    curl "${url}${filename}" -o "${filename}"
 
-      STY_LINE
-    else
-# Skipping if it is already present    
-      printf "File: ${GREEN}${filename} already there,${DARK_YELLOW} skipping download...${OFF}\n"
-      STY_LINE
-    fi   
-
+    STY_LINE
   done
 }
 
@@ -358,7 +338,7 @@ function updateRecovery() {
   curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm" && chmod +x dm || exit 1
   local dmBin="${tmpDirectory}/updRec/dm"
 
-  local recPkg="${tmpDirectory}/${keyIndex}/macOSUpd${version}.RecoveryHDUpdate.pkg"
+  local recPkg="${workDir}/macOSUpd${version}.RecoveryHDUpdate.pkg"
   [[ ! -f "${recPkg}" ]] && printf "ERROR: ${RED}${recPkg} NOT found!${OFF}\n" && exit 1
 
   local tmpRecUpdDir="/tmp/RecoveryHDUpdate"
@@ -387,7 +367,7 @@ function updateRecovery() {
 function updatePrimarySystem() {
   printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
 
-  cd "${tmpDirectory}/${keyIndex}"
+  cd "${workDir}"
 
   # remove these lines to avoid installer error
   sed -e '/volume-check/d' "${dist}"      > new1.txt
@@ -399,10 +379,10 @@ function updatePrimarySystem() {
   rm new?.txt
 
   # build pkg
-  productbuild --distribution "${tmpDirectory}/${keyIndex}/${dist}" --package-path "${tmpDirectory}/${keyIndex}" "${tmpDirectory}/${keyIndex}/${installerPackage}"
+  productbuild --distribution "${workDir}/${dist}" --package-path "${workDir}" "${workDir}/${installerPackage}"
 
   # perform the update by launching the installer
-  [[ -f "${tmpDirectory}/${keyIndex}/${installerPackage}" ]] && /usr/sbin/installer -pkg "${tmpDirectory}/${keyIndex}/${installerPackage}" -target "${volume}"
+  [[ -f "${workDir}/${installerPackage}" ]] && /usr/sbin/installer -pkg "${workDir}/${installerPackage}" -target "${volume}"
 }
 
 function updateSystem() {
@@ -418,7 +398,7 @@ function ask4Backup() {
   case "${confirmBackup}" in
     y|Y )
       printf "${CYAN}BACKING UP${OFF}\n"
-      hdiutil create -format UDZO -srcfolder "${tmpDirectory}/${keyIndex}/${installerPackage}" "${userPath}/Installer_${version}_${latestBuild}"
+      hdiutil create -format UDZO -srcfolder "${workDir}/${installerPackage}" "${userPath}/Installer_${version}_${build}"
     ;;
   esac
 }
@@ -426,7 +406,7 @@ function ask4Backup() {
 function endProgram() {
   printf "${CYAN}CLEANING UP${OFF}\n"
 
-  rm -rf "${tmpDirectory}/${keyIndex}"
+  rm -rf "${workDir}"
   rm -rf "${tmpDirectory}/update-catalogs"
   rm -rf "${tmpDirectory}/updRec"
   rm -rf "${tmpDirectory}/ver.txt"
