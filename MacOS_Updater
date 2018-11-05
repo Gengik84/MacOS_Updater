@@ -249,10 +249,16 @@ function downloadPackage() {
 
   # download them
   for filename in "${targetFiles[@]}"; do
-    # just in case there's a previous incomplete download...
-    rm -rf "${filename}"
-    printf "Downloading: ${BLUE}${filename}${OFF}...\n"
-    curl "${url}${filename}" -o "${filename}"
+    if [[ ! -e "${filename}" ]]; then
+    	printf "Downloading: ${BLUE}${filename}${OFF}...\n"
+    	curl "${url}${filename}" -o "${filename}"
+    elif [[ -z "$(pkgutil --check-signature ${filename} | grep -i 'signed Apple Software')" ]]; then
+    	printf "File: ${filename} is ${RED}CORRUPTED${OFF}, redownloading...\n"
+    	rm -rf "${filename}"
+    	curl "${url}${filename}" -o "${filename}"
+    else
+    	printf "File: ${GREEN}${filename}${OFF} is already there, ${DARK_YELLOW}skipping download.${OFF}\n"
+    fi
 
     STY_LINE
   done
