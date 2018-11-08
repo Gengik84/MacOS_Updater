@@ -20,16 +20,16 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="0.0"
+gScriptVersion="1.0"
 
 #
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-betaVersion="10.14.2"
+gBetaVersion="10.14.2"
 
 # stable version (ONLY the latest stable)
-stableVersion="10.14.1"
+gStableVersion="10.14.1"
 
 #----------------------------------------------------------------------------------------------------
 
@@ -41,33 +41,33 @@ stableVersion="10.14.1"
 
 # selected channel for determining URL
 # will be updated by selectChannel()
-channel=""
+gChannel=""
 # selected catalog URL (see channels and catalogs above)
 # will be updated by selectChannel()
-catalog=""
+gCatalog=""
 # selected system version
-version=""
+gVersion=""
 # target destination
-volume=""
+gVolume=""
 
 # package keys
 # will be updated by parseCatalog()
-urlIndex=""
-keyNum=""
-keyIndex=""
-keySalt=""
+gUrlIndex=""
+gKeyNum=""
+gKeyIndex=""
+gKeySalt=""
 # the exact url
-url=""
+gUrl=""
 # distribution file
-dist=""
+gDist=""
 
 # initialisation of a variable (our target folder).
-tmpDirectory="/tmp"
-workDir=""
+gTmpDirectory="/tmp"
+gWorkDir=""
 # name of target installer package
-installerPackage="installer.pkg"
+gInstallerPackage="installer.pkg"
 # backup dir
-userPath="/Users/`users`/Desktop"
+gUserPath="/Users/`users`/Desktop"
 
 #----------------------------------------------------------------------------------------------------
 
@@ -78,14 +78,14 @@ userPath="/Users/`users`/Desktop"
 #----------------------------------------------------------------------------------------------------
 
 # possible channels
-channels=(
+gChannels=(
   # dev beta (pub beta has been dropped)
   "Beta"
   # normal
   "Normal Channel"
 )
 # possible catalog URLs (corresponding to channels above)
-catalogs=(
+gCatalogs=(
   # beta
   "https://swscan.apple.com/content/catalogs/others/index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
   # normal
@@ -214,7 +214,7 @@ function selectChannel() {
   while true; do
     # list all possible channels
     printf "${CYAN}SELECT A CHANNEL${OFF}\n"
-    for c in "${channels[@]}"; do
+    for c in "${gChannels[@]}"; do
       printf "[ ${GREEN}${i}${OFF} ] ${PURPLE}${c}${OFF}\n"
       let i++
     done
@@ -230,10 +230,10 @@ function selectChannel() {
     fi
 
     # update vars
-    channel="${channels[channelNum]}"
-    catalog="${catalogs[channelNum]}"
+    gChannel="${gChannels[channelNum]}"
+    gCatalog="${gCatalogs[channelNum]}"
     # ask for confirmation
-    printf "Your choice: [ ${GREEN}${channelNum}${OFF} ] ${PURPLE}${channel}${OFF}\n"
+    printf "Your choice: [ ${GREEN}${channelNum}${OFF} ] ${PURPLE}${gChannel}${OFF}\n"
     while true; do
       local confirmChannel
       read -p ">> CONFIRM? (Y/N) " confirmChannel
@@ -269,38 +269,38 @@ function parseCatalog() {
   selectChannel
 
   # download catalog
-  cd "${tmpDirectory}"
+  cd "${gTmpDirectory}"
   [[ -f update-catalogs ]] && rm -f update-catalogs
-  downloadFile "${catalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
+  downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # show version
-  [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && version="${betaVersion}" || version="${stableVersion}"
+  [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]] && gVersion="${gBetaVersion}" || gVersion="${gStableVersion}"
 
   # update vars
-  urlIndex="$(cat /tmp/update-catalogs | \
-              grep macOSUpd${version} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+  gUrlIndex="$(cat /tmp/update-catalogs | \
+              grep macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
               sed 's/<string>//' | sed 's/<\/string>//' | \
               awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
-  [[ -z "${urlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
-  keyNum="$(  echo ${urlIndex} | cut -d/ -f2,3)"
-  keyIndex="$(echo ${urlIndex} | cut -d/ -f4,4)"
-  keySalt="$( echo ${urlIndex} | cut -d/ -f5,5)"
-  url="https://swdist.apple.com/content/downloads/${keyNum}/${keyIndex}/${keySalt}/"
-  dist="${keyIndex}.English.dist"
+  [[ -z "${gUrlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
+  gKeyNum="$(  echo ${gUrlIndex} | cut -d/ -f2,3)"
+  gKeyIndex="$(echo ${gUrlIndex} | cut -d/ -f4,4)"
+  gKeySalt="$( echo ${gUrlIndex} | cut -d/ -f5,5)"
+  gUrl="https://swdist.apple.com/content/downloads/${gKeyNum}/${gKeyIndex}/${gKeySalt}/"
+  gDist="${gKeyIndex}.English.dist"
 
   # create our working dir
-  workDir="${tmpDirectory}/${keyIndex}"
-  [[ ! -d "${workDir}" ]] && mkdir "${workDir}"
-  cd "${workDir}"
+  gWorkDir="${gTmpDirectory}/${gKeyIndex}"
+  [[ ! -d "${gWorkDir}" ]] && mkdir "${gWorkDir}"
+  cd "${gWorkDir}"
   # download dist
-  rm -f "${dist}"
-  printf "Downloading: ${BLUE}${dist}${OFF}...\n"
-  downloadFile "${url}${dist}" "${dist}"
+  rm -f "${gDist}"
+  printf "Downloading: ${BLUE}${gDist}${OFF}...\n"
+  downloadFile "${gUrl}${gDist}" "${gDist}"
 
   # show build
   local awkNR=0
-  [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && awkNR=13 || awkNR=12
-  build="$(cat ${dist} | \
+  [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]] && awkNR=13 || awkNR=12
+  build="$(cat ${gDist} | \
            sed 's/<string>//' | sed 's/<\/string>//' | \
            awk '{print $1;}'  | awk NR==${awkNR})"
 
@@ -309,7 +309,7 @@ function parseCatalog() {
 
 function confirmDownload() {
   while true; do
-    printf "${RED}${version} (${build})${OFF} will be downloaded, confirm? (y/n) "
+    printf "${RED}${gVersion} (${build})${OFF} will be downloaded, confirm? (y/n) "
     local confirmVer
     read -ea confirmVer
     case "${confirmVer}" in
@@ -324,7 +324,7 @@ function confirmDownload() {
       ;;
 
       n|N )
-        rm -rf "${workDir}"
+        rm -rf "${gWorkDir}"
         printf 'goodbye\n'
         exit 0
       ;;
@@ -338,16 +338,16 @@ function confirmDownload() {
 }
 
 function downloadPackage() {
-  # now we are inside "${workDir}" thanks to the prior parseCatalog()
+  # now we are inside "${gWorkDir}" thanks to the prior parseCatalog()
 
   # packages to be downloaded
   local targetFiles=(
     "FirmwareUpdate.pkg"
     "FullBundleUpdate.pkg"
     "EmbeddedOSFirmware.pkg"
-    "macOSUpd${version}.pkg"
-    "macOSUpd${version}.Patch.pkg"
-    "macOSUpd${version}.RecoveryHDUpdate.pkg"
+    "macOSUpd${gVersion}.pkg"
+    "macOSUpd${gVersion}.Patch.pkg"
+    "macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
     "macOSBrain.pkg"
     "SecureBoot.pkg"
   )
@@ -357,11 +357,11 @@ function downloadPackage() {
   for filename in "${targetFiles[@]}"; do
     if [[ ! -e "${filename}" ]]; then
       printf "Downloading: ${BLUE}${filename}${OFF}...\n"
-      downloadFile "${url}${filename}" "${filename}"
+      downloadFile "${gUrl}${filename}" "${filename}"
     elif [[ -z "$(pkgutil --check-signature ${filename} | grep -i 'signed Apple Software')" ]]; then
       printf "File: ${filename} is ${RED}CORRUPTED${OFF}, redownloading...\n"
       rm -rf "${filename}"
-      downloadFile "${url}${filename}" "${filename}"
+      downloadFile "${gUrl}${filename}" "${filename}"
     else
       printf "File: ${GREEN}${filename}${OFF} is already there, ${DARK_YELLOW}skipping download.${OFF}\n"
     fi
@@ -394,7 +394,7 @@ function selectDestination() {
       continue
     fi
 
-    volume="/Volumes/${targetVolumes[volNum]}"
+    gVolume="/Volumes/${targetVolumes[volNum]}"
     printf "Your choice: [ ${GREEN}${volNum}${OFF} ] ${CYAN}${vol}${OFF}\n"
     while true; do
       local confirmVol
@@ -430,7 +430,7 @@ function selectDestination() {
     echo '<plist version="1.0">'                                                                                   >> "${seedEnrollmentPlist}"
     echo '  <dict>'                                                                                                >> "${seedEnrollmentPlist}"
     echo '    <key>SeedProgram</key>'                                                                              >> "${seedEnrollmentPlist}"
-    if [[ "${channel}" == "Beta" ]]; then
+    if [[ "${gChannel}" == "Beta" ]]; then
       echo '    <string>DeveloperSeed</string>'                                                                    >> "${seedEnrollmentPlist}"
     else
       echo '    <string>CustomerSeed</string>'                                                                     >> "${seedEnrollmentPlist}"
@@ -443,14 +443,14 @@ function selectDestination() {
 function updateRecovery() {
   printf "${CYAN}UPDATING RECOVERY${OFF}\n"
 
-  cd "${tmpDirectory}"
+  cd "${gTmpDirectory}"
   rm -rf "updRec" && mkdir "updRec" && cd "updRec"
 
   # download dm for updating Recovery
   curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm" && chmod +x dm || exit 1
-  local dmBin="${tmpDirectory}/updRec/dm"
+  local dmBin="${gTmpDirectory}/updRec/dm"
 
-  local recPkg="${workDir}/macOSUpd${version}.RecoveryHDUpdate.pkg"
+  local recPkg="${gWorkDir}/macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
   [[ ! -f "${recPkg}" ]] && printf "ERROR: ${RED}${recPkg} NOT found!${OFF}\n" && exit 1
 
   local tmpRecUpdDir="/tmp/RecoveryHDUpdate"
@@ -462,12 +462,12 @@ function updateRecovery() {
   /usr/bin/hdiutil attach -nobrowse "${tmpDmg}" -mountpoint "${tmpMountPoint}"
 
   # probe target volume
-  local fsType="$(diskutil info "${volume}" | awk '$1 == "Type" { print $NF }')"
+  local fsType="$(diskutil info "${gVolume}" | awk '$1 == "Type" { print $NF }')"
   # start updating
   if [[ "${fsType}" == "apfs" ]]; then
-    "${dmBin}" ensureRecoveryBooter "${volume}" -base "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" -diag "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" -diagmachineblacklist 0 -installbootfromtarget 0 -slurpappleboot 0 -delappleboot 0 -addkernelcoredump 0
+    "${dmBin}" ensureRecoveryBooter "${gVolume}" -base "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" -diag "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" -diagmachineblacklist 0 -installbootfromtarget 0 -slurpappleboot 0 -delappleboot 0 -addkernelcoredump 0
   else
-    "${dmBin}" ensureRecoveryPartition "${volume}" "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" 0 0 0
+    "${dmBin}" ensureRecoveryPartition "${gVolume}" "${tmpMountPoint}/BaseSystem.dmg" "${tmpMountPoint}/BaseSystem.chunklist" "${tmpMountPoint}/AppleDiagnostics.dmg" "${tmpMountPoint}/AppleDiagnostics.chunklist" 0 0 0
   fi
 
   # done
@@ -479,22 +479,22 @@ function updateRecovery() {
 function updatePrimarySystem() {
   printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
 
-  cd "${workDir}"
+  cd "${gWorkDir}"
 
   # remove these lines to avoid installer error
-  sed -e '/volume-check/d' "${dist}"      > new1.txt
-  sed -e '/installation-check/d' new1.txt > new2.txt
-  sed -e '/RecoveryHDUpdate/d'   new2.txt > new3.txt
-  sed -e '/system-image/d'       new3.txt > new4.txt
-  sed -e '/Patch/d'              new4.txt > new5.txt
-  cp new5.txt "${dist}"
+  sed -e '/volume-check/d' "${gDist}"      > new1.txt
+  sed -e '/installation-check/d' new1.txt  > new2.txt
+  sed -e '/RecoveryHDUpdate/d'   new2.txt  > new3.txt
+  sed -e '/system-image/d'       new3.txt  > new4.txt
+  sed -e '/Patch/d'              new4.txt  > new5.txt
+  cp new5.txt "${gDist}"
   rm new?.txt
 
   # build pkg
-  productbuild --distribution "${workDir}/${dist}" --package-path "${workDir}" "${workDir}/${installerPackage}"
+  productbuild --distribution "${gWorkDir}/${gDist}" --package-path "${gWorkDir}" "${gWorkDir}/${gInstallerPackage}"
 
   # perform the update by launching the installer
-  [[ -f "${workDir}/${installerPackage}" ]] && /usr/sbin/installer -pkg "${workDir}/${installerPackage}" -target "${volume}"
+  [[ -f "${gWorkDir}/${gInstallerPackage}" ]] && /usr/sbin/installer -pkg "${gWorkDir}/${gInstallerPackage}" -target "${gVolume}"
 }
 
 function updateSystem() {
@@ -510,7 +510,7 @@ function ask4Backup() {
   case "${confirmBackup}" in
     y|Y )
       printf "${CYAN}BACKING UP${OFF}\n"
-      hdiutil create -format UDZO -srcfolder "${workDir}/${installerPackage}" "${userPath}/Installer_${version}_${build}"
+      hdiutil create -format UDZO -srcfolder "${gWorkDir}/${gInstallerPackage}" "${gUserPath}/Installer_${gVersion}_${build}"
     ;;
   esac
 }
@@ -518,9 +518,9 @@ function ask4Backup() {
 function endProgram() {
   printf "${CYAN}CLEANING UP${OFF}\n"
 
-  rm -rf "${workDir}"
-  rm -rf "${tmpDirectory}/update-catalogs"
-  rm -rf "${tmpDirectory}/updRec"
+  rm -rf "${gWorkDir}"
+  rm -rf "${gTmpDirectory}/update-catalogs"
+  rm -rf "${gTmpDirectory}/updRec"
 
   STY_LINE
   printf "${GREEN}RESTART REQUIRED${OFF}\n"
@@ -549,7 +549,7 @@ function main() {
       read -p "Drag installer.pkg on terminal windows: " installerPKG
       [[ ! -f "${installerPKG}" ]] && echo "${installerPKG} not found!" && exit 1
       printf "${CYAN}UPDATING PRIMARY SYSTEM${OFF}\n"
-      /usr/sbin/installer -pkg "${installerPKG}" -target "${volume}"
+      /usr/sbin/installer -pkg "${installerPKG}" -target "${gVolume}"
 
       endProgram
       # done
