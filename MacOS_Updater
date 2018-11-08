@@ -19,6 +19,9 @@ shopt -s nullglob
 #
 #----------------------------------------------------------------------------------------------------
 
+# script version
+gScriptVersion="0.0"
+
 #
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
@@ -102,6 +105,33 @@ OFF="\e[0m"
 
 function STY_LINE() {
   printf '%s\n\n' '-------------------------------------------------------------------------------'
+}
+
+function updateScript() {
+ local remoteAddr="https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/MacOS_Updater"
+ local tmpScriptPath="/tmp/MacOS_Updater"
+ # download remote script
+ rm -f "${tmpScriptPath}" && curl -s "${remoteAddr}" -o "${tmpScriptPath}" || exit 1
+ local remoteVer=$(cat ${tmpScriptPath} | grep '^gScriptVersion=' | tr -cd '.0-9')
+ 
+  if [[ "${gScriptVersion}" != "${remoteVer}" ]]; then
+    clear
+    printf "\tLocal Script Version: ${RED}${gScriptVersion}${OFF}\t\tUpdate available: ${GREEN}v${remoteVer}${OFF}\n"
+    local confirmScptUpd
+    read -p "Do you want update to the latest version? (y/n) " confirmScptUpd
+    case "${confirmScptUpd}" in
+      y|Y )
+        cp "${tmpScriptPath}" "$0"
+        STY_LINE
+        
+        printf "${BLUE}Running the new script...${OFF}"
+        local args="$@"
+        "$0" "${args}"
+        # do not run the current (old) script again
+        exit 0
+     ;;
+    esac
+  fi   
 }
 
 function downloadFile() {
@@ -272,7 +302,7 @@ function parseCatalog() {
   [[ "${channel}" == "Beta" && ! -z "${betaVersion}" ]] && awkNR=13 || awkNR=12
   build="$(cat ${dist} | \
            sed 's/<string>//' | sed 's/<\/string>//' | \
-           awk '{print $1;}'  | awk NR==${awkNR} 2>&1)"
+           awk '{print $1;}'  | awk NR==${awkNR})"
 
   confirmDownload
 }
@@ -491,7 +521,6 @@ function endProgram() {
   rm -rf "${workDir}"
   rm -rf "${tmpDirectory}/update-catalogs"
   rm -rf "${tmpDirectory}/updRec"
-  rm -rf "${tmpDirectory}/ver.txt"
 
   STY_LINE
   printf "${GREEN}RESTART REQUIRED${OFF}\n"
@@ -507,6 +536,8 @@ function endProgram() {
 }
 
 function main() {
+  updateScript "$@"
+
   # try to register the script
   registerScript
 
