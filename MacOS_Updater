@@ -20,7 +20,7 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="1.0"
+gScriptVersion="1.0.1"
 
 #
 # Beta version (ONLY the latest Beta)
