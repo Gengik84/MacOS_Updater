@@ -342,13 +342,13 @@ function downloadPackage() {
 
   # packages to be downloaded
   local targetFiles=(
-    "FirmwareUpdate.pkg"
-    "FullBundleUpdate.pkg"
-    "EmbeddedOSFirmware.pkg"
     "macOSUpd${gVersion}.pkg"
     "macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
     "macOSBrain.pkg"
     "SecureBoot.pkg"
+    "EmbeddedOSFirmware.pkg"
+    "FirmwareUpdate.pkg"
+    "FullBundleUpdate.pkg"
   )
 
   # download them
