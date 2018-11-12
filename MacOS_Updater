@@ -346,7 +346,6 @@ function downloadPackage() {
     "FullBundleUpdate.pkg"
     "EmbeddedOSFirmware.pkg"
     "macOSUpd${gVersion}.pkg"
-    "macOSUpd${gVersion}.Patch.pkg"
     "macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
     "macOSBrain.pkg"
     "SecureBoot.pkg"
@@ -487,6 +486,7 @@ function updatePrimarySystem() {
   sed -e '/installation-check/d' new1.txt  > new2.txt
   sed -e '/RecoveryHDUpdate/d'   new2.txt  > new3.txt
   sed -e '/system-image/d'       new3.txt  > new4.txt
+  # remove macOS${gVersion}Patch.pkg since it will cause installation failure
   sed -e '/Patch/d'              new4.txt  > new5.txt
   cp new5.txt "${gDist}"
   rm new?.txt
