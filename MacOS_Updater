@@ -20,16 +20,16 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="1.0.3"
+gScriptVersion="1.0.4"
 
 #
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-gBetaVersion="10.14.3"
+gBetaVersion="10.14.4"
 
 # stable version (ONLY the latest stable)
-gStableVersion="10.14.2"
+gStableVersion="10.14.3"
 
 #----------------------------------------------------------------------------------------------------
 
