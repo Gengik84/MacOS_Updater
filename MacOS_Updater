@@ -20,7 +20,7 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="1.0.4"
+gScriptVersion="1.0.5"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -274,7 +274,13 @@ function parseCatalog() {
   downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # show version
-  [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]] && gVersion="${gBetaVersion}" || gVersion="${gStableVersion}"
+  if [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]]; then
+    gVersion="${gBetaVersion}"
+  elif [[ "${gChannel}" == "Beta" && -z "${gBetaVersion}" ]]; then
+    echo "Warning: using Beta channel but there is no release at the moment!"
+    echo "Redirecting to Normal Channel and using version ${gStableVersion}."
+    gVersion="${gStableVersion}"
+  fi
 
   # update vars
   gUrlIndex="$(cat /tmp/update-catalogs | \
