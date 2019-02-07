@@ -20,7 +20,7 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="1.0.6"
+gScriptVersion="1.0.7"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -277,8 +277,11 @@ function parseCatalog() {
   if [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]]; then
     gVersion="${gBetaVersion}"
   elif [[ "${gChannel}" == "Beta" && -z "${gBetaVersion}" ]]; then
-    echo "Warning: using Beta channel but there is no release at the moment!"
-    echo "Redirecting to Normal Channel and using version ${gStableVersion}."
+    clear  
+    printf "${RED}Warning:${OFF} using Beta channel but there is no release at the moment!\n"
+    printf "Redirecting to ${PURPLE}Normal Channel ${OFF}and using version ${GREEN}${gStableVersion}${OFF}.\n"
+    sleep 2
+  elif [[ "${gChannel}" != "Beta" ]]; then  
     gVersion="${gStableVersion}"
   fi
 
@@ -286,14 +289,14 @@ function parseCatalog() {
   gUrlIndex="$(cat /tmp/update-catalogs | \
               grep macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
               sed 's/<string>//' | sed 's/<\/string>//' | \
-              awk '{print $1;}' | awk NR==1 | sed 's/^.*downloads//')"
+              awk '{print $1;}'  | sed 's/^.*downloads//')"
   [[ -z "${gUrlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
   gKeyNum="$(  echo ${gUrlIndex} | cut -d/ -f2,3)"
   gKeyIndex="$(echo ${gUrlIndex} | cut -d/ -f4,4)"
   gKeySalt="$( echo ${gUrlIndex} | cut -d/ -f5,5)"
   gUrl="https://swdist.apple.com/content/downloads/${gKeyNum}/${gKeyIndex}/${gKeySalt}/"
   gDist="${gKeyIndex}.English.dist"
-
+  
   # create our working dir
   gWorkDir="${gTmpDirectory}/${gKeyIndex}"
   [[ ! -d "${gWorkDir}" ]] && mkdir "${gWorkDir}"
