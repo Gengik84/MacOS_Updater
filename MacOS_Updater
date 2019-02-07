@@ -20,7 +20,7 @@ shopt -s nullglob
 #----------------------------------------------------------------------------------------------------
 
 # script version
-gScriptVersion="1.0.7"
+gScriptVersion="1.0.8"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -268,22 +268,27 @@ function selectChannel() {
 function parseCatalog() {
   selectChannel
 
-  # download catalog
-  cd "${gTmpDirectory}"
-  [[ -f update-catalogs ]] && rm -f update-catalogs
-  downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
-
   # show version
   if [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]]; then
     gVersion="${gBetaVersion}"
   elif [[ "${gChannel}" == "Beta" && -z "${gBetaVersion}" ]]; then
-    clear  
     printf "${RED}Warning:${OFF} using Beta channel but there is no release at the moment!\n"
     printf "Redirecting to ${PURPLE}Normal Channel ${OFF}and using version ${GREEN}${gStableVersion}${OFF}.\n"
+
+    # manually put normal channel and stable version here for redirection
+    gChannel="${gChannels[1]}"
+    gCatalog="${gCatalogs[1]}"
+    gVersion="${gStableVersion}"
+
     sleep 2
   elif [[ "${gChannel}" != "Beta" ]]; then  
     gVersion="${gStableVersion}"
   fi
+
+  # download catalog
+  cd "${gTmpDirectory}"
+  [[ -f update-catalogs ]] && rm -f update-catalogs
+  downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # update vars
   gUrlIndex="$(cat /tmp/update-catalogs | \
@@ -296,7 +301,7 @@ function parseCatalog() {
   gKeySalt="$( echo ${gUrlIndex} | cut -d/ -f5,5)"
   gUrl="https://swdist.apple.com/content/downloads/${gKeyNum}/${gKeyIndex}/${gKeySalt}/"
   gDist="${gKeyIndex}.English.dist"
-  
+
   # create our working dir
   gWorkDir="${gTmpDirectory}/${gKeyIndex}"
   [[ ! -d "${gWorkDir}" ]] && mkdir "${gWorkDir}"
