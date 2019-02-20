@@ -19,8 +19,10 @@ shopt -s nullglob
 #
 #----------------------------------------------------------------------------------------------------
 
+#
 # script version
-gScriptVersion="1.0.8"
+#
+gScriptVersion="1.0.9"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -28,8 +30,76 @@ gScriptVersion="1.0.8"
 #
 gBetaVersion="10.14.4"
 
+#
 # stable version (ONLY the latest stable)
+#
 gStableVersion="10.14.3"
+
+#
+# Current macOS version returned from sw_vers.
+#
+gProductVersion="$(sw_vers -productVersion)"
+
+#
+# Current macOS major version.
+# For example: given gProductVersion 10.14.3, gProductMajorVersion will be 14.
+#
+gProductMajorVersion="${gProductVersion:3:2}"
+
+#
+# Current macOS minor version.
+# For example: given gProductVersion 10.14.3, gProductMinorVersion will be 3.
+#
+gProductMinorVersion="${gProductVersion:6:2}"
+# NOTE: It will be null when no minor version available. Appending 0.
+[[ -z "${gProductMinorVersion}" ]] && gProductMinorVersion=0
+
+#
+# Beta Major version
+# For example: given gBetaVersion 10.14.4, gBetaMajorVersion will be 14.
+#
+gBetaMajorVersion="${gBetaVersion:3:2}"
+
+#
+# Beta Minor version
+# For example: given gBetaVersion 10.14.4, gBetaMinorVersion will be 4.
+#
+gBetaMinorVersion="${gBetaVersion:6:2}"
+# NOTE: It will be null when no minor version available. Appending 0.
+[[ -z "${gBetaMinorVersion}" ]] && gBetaMinorVersion=0
+
+#
+# Stable Major version
+# For example: given gStableVersion 10.14.4, gStableMajorVersion will be 14.
+#
+gStableMajorVersion="${gStableVersion:3:2}"
+
+#
+# Stable Minor version
+# For example: given gStableVersion 10.14.3, gStableMinorVersion will be 3.
+#
+gStableMinorVersion="${gStableVersion:6:2}"
+# NOTE: It will be null when no minor version available. Appending 0.
+[[ -z "${gStableMinorVersion}" ]] && gStableMinorVersion=0
+
+#
+# Package Mode:
+#  Delta - a more lightweight package, should only be used on the most recent macOS.
+#  Combo - a reasonably full package, could be used on all major releases, used by default.
+#
+#  When to use Delta (pseudo code):
+#    gProductMajorVersion == gBetaMajorVersion                                                    &&
+#    gProductMinorVersion == gBetaMinorVersion         [e.g update from 10.14.4 b1 to 10.14.4 b3] ||
+#    gProductMinorVersion == (gBetaMinorVersion - 1)   [e.g update from 10.14.3 to 10.14.4 b3]
+#===============================================================================================================
+#    gProductMajorVersion == gStableMajorVersion                                                                &&
+#    gProductMinorVersion == gStableMinorVersion       [e.g update from 10.14.3 to 10.14.3 supplemental update] ||
+#    gProductMinorVersion == (gStableMinorVersion - 1) [e.g update from 10.14.2 to 10.14.3]
+#
+#  When to use Combo:
+#    Of course, scenarios other than ones using Delta...
+#
+gPackageMode="Combo"
 
 #----------------------------------------------------------------------------------------------------
 
@@ -105,6 +175,30 @@ OFF="\e[0m"
 
 function STY_LINE() {
   printf '%s\n\n' '-------------------------------------------------------------------------------'
+}
+
+function setPackageMode() {
+  if [[ "${gChannel}" == 'Beta' ]]; then
+    let "gBetaMinorVersionMinusOne   = gBetaMinorVersion   - 1"
+    if [[ "${gProductMajorVersion}" -eq "${gBetaMajorVersion}" && \
+          "${gProductMinorVersion}" -eq "${gBetaMinorVersion}" || \
+          "${gProductMinorVersion}" -eq "${gBetaMinorVersionMinusOne}" ]]; then
+        printf "\nUsing ${GREEN}Delta${OFF} package (Beta).\n\n"
+        gPackageMode='Delta'
+    else
+      printf "\nUsing ${DARK_YELLOW}Combo${OFF} package (Beta).\n\n"
+    fi
+  else
+    let "gStableMinorVersionMinusOne = gStableMinorVersion - 1"
+    if [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
+          "${gProductMinorVersion}" -eq "${gStableMinorVersion}" || \
+          "${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
+      printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
+      gPackageMode='Delta'
+    else
+      printf "\nUsing ${DARK_YELLOW}Combo${OFF} package (Stable).\n\n"
+    fi
+  fi
 }
 
 function updateScript() {
@@ -285,16 +379,26 @@ function parseCatalog() {
     gVersion="${gStableVersion}"
   fi
 
+  # check if it is fine to go with Delta
+  setPackageMode
+
   # download catalog
   cd "${gTmpDirectory}"
   [[ -f update-catalogs ]] && rm -f update-catalogs
   downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
   # update vars
-  gUrlIndex="$(cat /tmp/update-catalogs | \
-              grep macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-              sed 's/<string>//' | sed 's/<\/string>//' | \
-              awk '{print $1;}'  | sed 's/^.*downloads//')"
+  if [[ "${gPackageMode}" == 'Combo' ]]; then
+    gUrlIndex="$(cat /tmp/update-catalogs | \
+                 grep macOSUpdCombo${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 sed 's/<string>//' | sed 's/<\/string>//' | \
+                 awk '{print $1;}'  | sed 's/^.*downloads//')"
+  else
+    gUrlIndex="$(cat /tmp/update-catalogs | \
+                 grep macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 sed 's/<string>//' | sed 's/<\/string>//' | \
+                 awk '{print $1;}'  | sed 's/^.*downloads//')"
+  fi
   [[ -z "${gUrlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
   gKeyNum="$(  echo ${gUrlIndex} | cut -d/ -f2,3)"
   gKeyIndex="$(echo ${gUrlIndex} | cut -d/ -f4,4)"
@@ -355,15 +459,27 @@ function downloadPackage() {
   # now we are inside "${gWorkDir}" thanks to the prior parseCatalog()
 
   # packages to be downloaded
-  local targetFiles=(
-    "macOSUpd${gVersion}.pkg"
-    "macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
-    "macOSBrain.pkg"
-    "SecureBoot.pkg"
-    "EmbeddedOSFirmware.pkg"
-    "FirmwareUpdate.pkg"
-    "FullBundleUpdate.pkg"
-  )
+  if [[ "${gPackageMode}" == 'Combo' ]]; then
+    local targetFiles=(
+      "macOSUpdCombo${gVersion}.pkg"
+      "macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+      "macOSBrain.pkg"
+      "SecureBoot.pkg"
+      "EmbeddedOSFirmware.pkg"
+      "FirmwareUpdate.pkg"
+      "FullBundleUpdate.pkg"
+    )
+  else
+    local targetFiles=(
+      "macOSUpd${gVersion}.pkg"
+      "macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
+      "macOSBrain.pkg"
+      "SecureBoot.pkg"
+      "EmbeddedOSFirmware.pkg"
+      "FirmwareUpdate.pkg"
+      "FullBundleUpdate.pkg"
+    )
+  fi
 
   # download them
   clear
@@ -464,7 +580,11 @@ function updateRecovery() {
   curl -O "https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/dm" && chmod +x dm || exit 1
   local dmBin="${gTmpDirectory}/updRec/dm"
 
-  local recPkg="${gWorkDir}/macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
+  if [[ "${gPackageMode}" == 'Combo' ]]; then
+    local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+  else
+    local recPkg="${gWorkDir}/macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
+  fi
   [[ ! -f "${recPkg}" ]] && printf "ERROR: ${RED}${recPkg} NOT found!${OFF}\n" && exit 1
 
   local tmpRecUpdDir="/tmp/RecoveryHDUpdate"
