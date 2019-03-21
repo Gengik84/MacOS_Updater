@@ -5,7 +5,7 @@ Script to download macOS Mojave updates. Particularly for those who are still us
 ## How to use?
 Run the command below (will be downloaded to the current directory):
 ```
-curl -O https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/MacOS_Updater && chmod +x ./MacOS_Updater && sh ./MacOS_Updater
+sudo curl -o /usr/bin/MacOS_Updater https://raw.githubusercontent.com/STiXzoOR/MacOS_Updater/master/MacOS_Updater && sudo chmod a+x /usr/bin/MacOS_Updater
 ```
 
 ## Credits
