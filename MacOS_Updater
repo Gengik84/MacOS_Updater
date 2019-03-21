@@ -195,9 +195,9 @@ function setPackageMode() {
       	printf "\nUsing ${GREEN}Delta Supplemental${OFF} package (Stable).\n\n"
       	gPackageMode='DeltaSup'
     elif [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
-          	"${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
-    			printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
-      		gPackageMode='Delta'
+          "${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
+      	printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
+      	gPackageMode='Delta'
     else
       printf "\nUsing ${DARK_YELLOW}Combo${OFF} package (Stable).\n\n"
     fi
@@ -471,6 +471,16 @@ function downloadPackage() {
     local targetFiles=(
       "macOSUpdCombo${gVersion}.pkg"
       "macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+      "macOSBrain.pkg"
+      "SecureBoot.pkg"
+      "EmbeddedOSFirmware.pkg"
+      "FirmwareUpdate.pkg"
+      "FullBundleUpdate.pkg"
+    )
+  elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
+    local targetFiles=(
+      "macOSUpd${gVersion}Supplemental.pkg"
+      "macOSUpd${gVersion}Supplemental.RecoveryHDUpdate.pkg"
       "macOSBrain.pkg"
       "SecureBoot.pkg"
       "EmbeddedOSFirmware.pkg"
