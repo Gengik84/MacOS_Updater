@@ -191,10 +191,13 @@ function setPackageMode() {
   else
     let "gStableMinorVersionMinusOne = gStableMinorVersion - 1"
     if [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
-          "${gProductMinorVersion}" -eq "${gStableMinorVersion}" || \
-          "${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
-      printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
-      gPackageMode='Delta'
+          "${gProductMinorVersion}" -eq "${gStableMinorVersion}" ]]; then
+      	printf "\nUsing ${GREEN}Delta Supplemental${OFF} package (Stable).\n\n"
+      	gPackageMode='DeltaSup'
+    elif [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
+          	"${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
+    			printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
+      		gPackageMode='Delta'
     else
       printf "\nUsing ${DARK_YELLOW}Combo${OFF} package (Stable).\n\n"
     fi
@@ -393,9 +396,14 @@ function parseCatalog() {
                  grep macOSUpdCombo${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
                  sed 's/<string>//' | sed 's/<\/string>//' | \
                  awk '{print $1;}'  | sed 's/^.*downloads//')"
-  else
+  elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 grep macOSUpd${gVersion}Supplemental | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 sed 's/<string>//' | sed 's/<\/string>//' | \
+                 awk '{print $1;}'  | sed 's/^.*downloads//')"
+  else
+  	gUrlIndex="$(cat /tmp/update-catalogs | \
+                 grep macOSUpd${gVersion}.pkg | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
                  sed 's/<string>//' | sed 's/<\/string>//' | \
                  awk '{print $1;}'  | sed 's/^.*downloads//')"
   fi
