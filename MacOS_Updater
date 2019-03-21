@@ -195,7 +195,7 @@ function setPackageMode() {
       	printf "\nUsing ${GREEN}Delta Supplemental${OFF} package (Stable).\n\n"
       	gPackageMode='DeltaSup'
     elif [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
-          	"${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
+            "${gProductMinorVersion}" -eq "${gStableMinorVersionMinusOne}" ]]; then
       	printf "\nUsing ${GREEN}Delta${OFF} package (Stable).\n\n"
       	gPackageMode='Delta'
     else
