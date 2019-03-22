@@ -22,7 +22,7 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.10"
+gScriptVersion="1.0.11"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -393,17 +393,17 @@ function parseCatalog() {
   # update vars
   if [[ "${gPackageMode}" == 'Combo' ]]; then
     gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep -w macOSUpdCombo${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 grep macOSUpdCombo${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
                  sed 's/<string>//' | sed 's/<\/string>//' | \
                  awk '{print $1;}'  | sed 's/^.*downloads//')"
   elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep -w macOSUpd${gVersion}Supplemental | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 grep macOSUpd${gVersion}Supplemental | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
                  sed 's/<string>//' | sed 's/<\/string>//' | \
                  awk '{print $1;}'  | sed 's/^.*downloads//')"
   else
     gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep -w macOSUpd${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+                 grep macOSUpd${gVersion}.pkg | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
                  sed 's/<string>//' | sed 's/<\/string>//' | \
                  awk '{print $1;}'  | sed 's/^.*downloads//')"
   fi
