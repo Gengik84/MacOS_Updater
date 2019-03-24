@@ -600,6 +600,8 @@ function updateRecovery() {
 
   if [[ "${gPackageMode}" == 'Combo' ]]; then
     local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+  elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
+    local recPkg="${gWorkDir}/macOSUpd${gVersion}Supplemental.RecoveryHDUpdate.pkg"
   else
     local recPkg="${gWorkDir}/macOSUpd${gVersion}.RecoveryHDUpdate.pkg"
   fi
