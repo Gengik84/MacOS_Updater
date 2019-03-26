@@ -469,7 +469,7 @@ function downloadPackage() {
   # packages to be downloaded
   if [[ "${gPackageMode}" == 'Combo' ]]; then
     local targetFiles=(
-      "macOSUpdCombo${gVersion}Autp.pkg"
+      "macOSUpdCombo${gVersion}Auto.pkg"
       "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
       "macOSBrain.pkg"
       "SecureBoot.pkg"
