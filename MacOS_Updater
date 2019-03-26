@@ -22,7 +22,7 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.12"
+gScriptVersion="1.0.13"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -33,7 +33,7 @@ gBetaVersion="10.14.4"
 #
 # stable version (ONLY the latest stable)
 #
-gStableVersion="10.14.3"
+gStableVersion="10.14.4"
 
 #
 # Current macOS version returned from sw_vers.
@@ -469,8 +469,8 @@ function downloadPackage() {
   # packages to be downloaded
   if [[ "${gPackageMode}" == 'Combo' ]]; then
     local targetFiles=(
-      "macOSUpdCombo${gVersion}.pkg"
-      "macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+      "macOSUpdCombo${gVersion}Auto.pkg"
+      "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
       "macOSBrain.pkg"
       "SecureBoot.pkg"
       "EmbeddedOSFirmware.pkg"
