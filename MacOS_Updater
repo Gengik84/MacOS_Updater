@@ -22,7 +22,7 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.15"
+gScriptVersion="1.0.16"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -468,15 +468,29 @@ function downloadPackage() {
 
   # packages to be downloaded
   if [[ "${gPackageMode}" == 'Combo' ]]; then
-    local targetFiles=(
-      "macOSUpdCombo${gVersion}Auto.pkg"
-      "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
-      "macOSBrain.pkg"
-      "SecureBoot.pkg"
-      "EmbeddedOSFirmware.pkg"
-      "FirmwareUpdate.pkg"
-      "FullBundleUpdate.pkg"
-    )
+    # Looks like only 10.14.4 has Auto suffixed and others do not.
+    # TODO: find when Auto exists and when not.
+    if [[ "${gVersion}" == '10.14.4' ]]; then
+      local targetFiles=(
+        "macOSUpdCombo${gVersion}Auto.pkg"
+        "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
+        "macOSBrain.pkg"
+        "SecureBoot.pkg"
+        "EmbeddedOSFirmware.pkg"
+        "FirmwareUpdate.pkg"
+        "FullBundleUpdate.pkg"
+      )
+    else
+      local targetFiles=(
+        "macOSUpdCombo${gVersion}.pkg"
+        "macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+        "macOSBrain.pkg"
+        "SecureBoot.pkg"
+        "EmbeddedOSFirmware.pkg"
+        "FirmwareUpdate.pkg"
+        "FullBundleUpdate.pkg"
+      )
+    fi
   elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     local targetFiles=(
       "macOSUpd${gVersion}Supplemental.pkg"
@@ -599,7 +613,13 @@ function updateRecovery() {
   local dmBin="${gTmpDirectory}/updRec/dm"
 
   if [[ "${gPackageMode}" == 'Combo' ]]; then
-    local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+    # Looks like only 10.14.4 has Auto suffixed and others do not.
+    # TODO: find when Auto exists and when not.
+    if [[ "${gVersion}" == '10.14.4' ]]; then
+      local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
+    else
+      local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+    fi
   elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     local recPkg="${gWorkDir}/macOSUpd${gVersion}Supplemental.RecoveryHDUpdate.pkg"
   else
