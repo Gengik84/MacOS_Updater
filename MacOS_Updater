@@ -22,19 +22,19 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.15"
+gScriptVersion="1.0.16"
 
 #
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-gBetaVersion=""
+gBetaVersion="10.14.5"
 
 #
 # Beta build version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-gBetaBuildVersion=""
+gBetaBuildVersion="18F96h"
 
 #
 # stable version (ONLY the latest stable)
@@ -195,6 +195,10 @@ function STY_LINE() {
 
 function setPackageMode() {
   if [[ "${gChannel}" == 'Beta' ]]; then
+    if [[ "${gBetaBuildVersion}" == "${gBuildVersion}" ]]; then
+        printf 'Looks like you are already on the latest beta version, no need to update. Exiting...\n'
+        exit 0
+    fi
     let "gBetaMinorVersionMinusOne   = gBetaMinorVersion   - 1"
     if [[ "${gProductMajorVersion}" -eq "${gBetaMajorVersion}" && \
           "${gProductMinorVersion}" -eq "${gBetaMinorVersion}" || \
@@ -205,6 +209,10 @@ function setPackageMode() {
       printf "\nUsing ${DARK_YELLOW}Combo${OFF} package (Beta).\n\n"
     fi
   else
+  	if [[ "${gStableBuildVersion}" == "${gBuildVersion}" ]]; then
+        printf 'Looks like you are already on the latest stable version, no need to update. Exiting...\n'
+        exit 0
+    fi
     let "gStableMinorVersionMinusOne = gStableMinorVersion - 1"
     if [[ "${gProductMajorVersion}" -eq "${gStableMajorVersion}" && \
           "${gProductMinorVersion}" -eq "${gStableMinorVersion}" ]]; then
@@ -484,15 +492,29 @@ function downloadPackage() {
 
   # packages to be downloaded
   if [[ "${gPackageMode}" == 'Combo' ]]; then
-    local targetFiles=(
-      "macOSUpdCombo${gVersion}Auto.pkg"
-      "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
-      "macOSBrain.pkg"
-      "SecureBoot.pkg"
-      "EmbeddedOSFirmware.pkg"
-      "FirmwareUpdate.pkg"
-      "FullBundleUpdate.pkg"
-    )
+    # Looks like only 10.14.4 has Auto suffixed and others do not.
+    # TODO: find when Auto exists and when not.
+    if [[ "${gVersion}" == '10.14.4' ]]; then
+      local targetFiles=(
+        "macOSUpdCombo${gVersion}Auto.pkg"
+        "macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
+        "macOSBrain.pkg"
+        "SecureBoot.pkg"
+        "EmbeddedOSFirmware.pkg"
+        "FirmwareUpdate.pkg"
+        "FullBundleUpdate.pkg"
+      )
+    else
+      local targetFiles=(
+        "macOSUpdCombo${gVersion}.pkg"
+        "macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+        "macOSBrain.pkg"
+        "SecureBoot.pkg"
+        "EmbeddedOSFirmware.pkg"
+        "FirmwareUpdate.pkg"
+        "FullBundleUpdate.pkg"
+      )
+    fi
   elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     local targetFiles=(
       "macOSUpd${gVersion}Supplemental.pkg"
@@ -615,7 +637,13 @@ function updateRecovery() {
   local dmBin="${gTmpDirectory}/updRec/dm"
 
   if [[ "${gPackageMode}" == 'Combo' ]]; then
-    local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+    # Looks like only 10.14.4 has Auto suffixed and others do not.
+    # TODO: find when Auto exists and when not.
+    if [[ "${gVersion}" == '10.14.4' ]]; then
+      local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}Auto.RecoveryHDUpdate.pkg"
+    else
+      local recPkg="${gWorkDir}/macOSUpdCombo${gVersion}.RecoveryHDUpdate.pkg"
+    fi
   elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
     local recPkg="${gWorkDir}/macOSUpd${gVersion}Supplemental.RecoveryHDUpdate.pkg"
   else
@@ -727,12 +755,6 @@ function main() {
       exit 0
     ;;
   esac
-
-  if [[ "${gStableBuildVersion}" == "${gBuildVersion}" || \
-  	    "${gBetaBuildVersion}" == "${gBuildVersion}" ]]; then
-    printf 'Looks like you are already on latest version, no need for update. Exiting...\n'
-    exit 0
-  fi
 
   parseCatalog
   downloadPackage
