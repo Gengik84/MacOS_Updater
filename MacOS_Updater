@@ -28,12 +28,12 @@ gScriptVersion="1.0.16"
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-gBetaVersion="10.14.5"
+gBetaVersion=""
 
 #
 # stable version (ONLY the latest stable)
 #
-gStableVersion="10.14.4"
+gStableVersion="10.14.5"
 
 #
 # Current macOS version returned from sw_vers.
