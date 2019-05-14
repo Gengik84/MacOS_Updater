@@ -443,6 +443,7 @@ function parseCatalog() {
   local isBeta="$(isProductBeta)"
   if [[ "${isBeta}" -eq 1               && \
         "${gPackageMode}" == 'DeltaSup' && \
+        -z "${gUrlIndex}" ]]; then
     printf 'You are on Beta and going to update to supplemental update,\nbut there is nothing at the moment!\nUpdating to the latest stable version via Delta.\n\n'
 
     gPackageMode='Delta'
