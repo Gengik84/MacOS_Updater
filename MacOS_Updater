@@ -22,7 +22,7 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.17"
+gScriptVersion="1.0.18"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -36,9 +36,14 @@ gBetaVersion=""
 gStableVersion="10.14.5"
 
 #
-# Current macOS version returned from sw_vers.
+# Current macOS version returned from sw_vers (e.g 10.14.5).
 #
 gProductVersion="$(sw_vers -productVersion)"
+
+#
+# Current macOS build returned from sw_vers (e.g 18F132).
+#
+gProductBuildVersion="$(sw_vers -buildVersion)"
 
 #
 # Current macOS major version.
@@ -175,6 +180,18 @@ OFF="\e[0m"
 
 function STY_LINE() {
   printf '%s\n\n' '-------------------------------------------------------------------------------'
+}
+
+function isProductBeta() {
+  # if the last char of build version is a lowercased letter,
+  # then it is Beta, 1 will be returned.
+  local chBetaIndicator="${gProductBuildVersion:-1}"
+  if [[ "${chBetaIndicator}" =~ [a-z] ]]; then
+    echo 1
+    return
+  fi
+
+  echo 0
 }
 
 function setPackageMode() {
@@ -362,6 +379,15 @@ function selectChannel() {
   done
 }
 
+function getURLIndex() {
+  local str2Grep="${1}"
+
+  echo "$(cat /tmp/update-catalogs | \
+          grep "${str2Grep}" | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
+          sed 's/<string>//' | sed 's/<\/string>//' | \
+          awk '{print $1;}'  | sed 's/^.*downloads//')"
+}
+
 function parseCatalog() {
   selectChannel
 
@@ -390,23 +416,48 @@ function parseCatalog() {
   [[ -f update-catalogs ]] && rm -f update-catalogs
   downloadFile "${gCatalog}" "update-catalogs.gz" && gunzip update-catalogs.gz || exit 1
 
+  # default value for Delta
+  local str2Grep="macOSUpd${gVersion}.pkg"
+  case "${gPackageMode}" in
+    'Combo' )
+      str2Grep="macOSUpdCombo${gVersion}"
+    ;;
+
+    'DeltaSup' )
+      str2Grep="macOSUpd${gVersion}Supplemental"
+    ;;
+  esac
+
   # update vars
-  if [[ "${gPackageMode}" == 'Combo' ]]; then
-    gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep macOSUpdCombo${gVersion} | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-                 sed 's/<string>//' | sed 's/<\/string>//' | \
-                 awk '{print $1;}'  | sed 's/^.*downloads//')"
-  elif [[ "${gPackageMode}" == 'DeltaSup' ]]; then
-    gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep macOSUpd${gVersion}Supplemental | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-                 sed 's/<string>//' | sed 's/<\/string>//' | \
-                 awk '{print $1;}'  | sed 's/^.*downloads//')"
-  else
-    gUrlIndex="$(cat /tmp/update-catalogs | \
-                 grep macOSUpd${gVersion}.pkg | grep pkg | grep -v RecoveryHDUpdate | grep -v Patch | grep -v integrityData | \
-                 sed 's/<string>//' | sed 's/<\/string>//' | \
-                 awk '{print $1;}'  | sed 's/^.*downloads//')"
+  gUrlIndex="$(getURLIndex "${str2Grep}")"
+
+  #
+  # When upgrading, for example,
+  # from 10.14.5 Beta  (18F131a)
+  # to   10.14.5 Final (18F132),
+  # gPackageMode would be set to DeltaSup, which is fine,
+  # yet supplemental update may not exist
+  # all the time, that is to say that gUrlIndex is null.
+  # We are going to be back to Delta in this case and check again.
+  #
+  local isBeta="$(isProductBeta)"
+  if [[ "${isBeta}" -eq 1               && \
+        "${gPackageMode}" == 'DeltaSup' && \
+    printf 'You are on Beta and going to update to supplemental update,\nbut there is nothing at the moment!\nUpdating to the latest stable version via Delta.\n\n'
+
+    gPackageMode='Delta'
+
+    str2Grep="macOSUpd${gVersion}.pkg"
+    gUrlIndex="$(getURLIndex "${str2Grep}")"
   fi
+
+  if [[ "${gChannel}" == "Normal Channel" && \
+        -z "${gUrlIndex}"                 && \
+        "${gProductVersion}" == "${gStableVersion}" ]]; then
+    printf "You are already ${GREEN}up to date${OFF}!\n"
+    exit 0
+  fi
+
   [[ -z "${gUrlIndex}" ]] && printf "ERROR: ${RED}URL Index not found!${OFF}\n" && exit 1
   gKeyNum="$(  echo ${gUrlIndex} | cut -d/ -f2,3)"
   gKeyIndex="$(echo ${gUrlIndex} | cut -d/ -f4,4)"
