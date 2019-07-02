@@ -9,7 +9,7 @@
 #
 
 # uncomment to enable debug logging
-set -x
+# set -x
 
 # Change additional shell optional behavior (expand unmatched names to a null string).
 shopt -s nullglob
