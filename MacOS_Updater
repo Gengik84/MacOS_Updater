@@ -9,7 +9,7 @@
 #
 
 # uncomment to enable debug logging
-# set -x
+set -x
 
 # Change additional shell optional behavior (expand unmatched names to a null string).
 shopt -s nullglob
@@ -28,7 +28,7 @@ gScriptVersion="1.0.19"
 # Beta version (ONLY the latest Beta)
 # could be empty when there is no Beta available. (consider 10.14.6)
 #
-gBetaVersion="10.14.6"
+gBetaVersion="10.15"
 
 #
 # stable version (ONLY the latest stable)
@@ -104,7 +104,7 @@ gStableMinorVersion="${gStableVersion:6:2}"
 #  When to use Combo:
 #    Of course, scenarios other than ones using Delta...
 #
-gPackageMode="Combo"
+gPackageMode="Delta"
 
 #----------------------------------------------------------------------------------------------------
 
@@ -162,7 +162,7 @@ gChannels=(
 # possible catalog URLs (corresponding to channels above)
 gCatalogs=(
   # beta
-  "https://swscan.apple.com/content/catalogs/others/index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
+  "https://swscan.apple.com/content/catalogs/others/index-10.15seed-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
   # normal
   "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz"
 )
@@ -477,7 +477,7 @@ function parseCatalog() {
 
   # show build
   local awkNR=0
-  [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]] && awkNR=13 || awkNR=12
+  [[ "${gChannel}" == "Beta" && ! -z "${gBetaVersion}" ]] && awkNR=15 || awkNR=12
   build="$(cat ${gDist} | \
            sed 's/<string>//' | sed 's/<\/string>//' | \
            awk '{print $1;}'  | awk NR==${awkNR})"
