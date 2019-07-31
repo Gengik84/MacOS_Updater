@@ -22,7 +22,7 @@ shopt -s nullglob
 #
 # script version
 #
-gScriptVersion="1.0.19"
+gScriptVersion="beta"
 
 #
 # Beta version (ONLY the latest Beta)
@@ -222,7 +222,7 @@ function setPackageMode() {
 }
 
 function updateScript() {
- local remoteAddr="https://raw.githubusercontent.com/Gengik84/MacOS_Updater/master/MacOS_Updater"
+ local remoteAddr="https://github.com/Gengik84/MacOS_Updater/blob/Catalina/MacOS_Updater"
  local tmpScriptPath="/tmp/MacOS_Updater"
  # download remote script
  rm -f "${tmpScriptPath}" && curl -s "${remoteAddr}" -o "${tmpScriptPath}" || exit 1
